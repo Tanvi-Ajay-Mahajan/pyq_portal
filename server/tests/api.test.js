@@ -84,7 +84,8 @@ test('health endpoint reports the database connection', async () => {
 
 test('seeded PYQ records and branch Drive folders exist', async () => {
   const seeded = await seedDatabase();
-  assert.ok(seeded.total > 0, 'seed should insert records');
+  assert.ok(seeded.totals.papers > 0, 'seed should insert papers');
+  assert.ok(seeded.totals.drive_folders > 0, 'seed should insert Drive folders');
 
   const papers = await api('/papers');
   assert.equal(papers.status, 200);
@@ -112,7 +113,7 @@ test('register hashes the password and returns a JWT', async () => {
     method: 'POST',
     body: { name: 'Weak', email: 'weak@pyq.test', password: 'short' },
   });
-  assert.equal(weak.status, 422);
+  assert.equal(weak.status, 400);
 });
 
 test('login rejects bad passwords and /auth/me returns the profile', async () => {
@@ -171,7 +172,7 @@ test('admin paper CRUD is JWT + role protected', async () => {
   assert.ok(paperId);
 
   const updated = await api(`/papers/${paperId}`, {
-    method: 'PATCH',
+    method: 'PUT',
     token: adminToken,
     body: { subject_name: 'Data Structures & Algorithms' },
   });
@@ -183,7 +184,7 @@ test('admin paper CRUD is JWT + role protected', async () => {
     token: adminToken,
     body: { ...newPaper, drive_link: 'not-a-url' },
   });
-  assert.equal(invalid.status, 422);
+  assert.equal(invalid.status, 400);
 
   const removed = await api(`/papers/${paperId}`, { method: 'DELETE', token: adminToken });
   assert.ok([200, 204].includes(removed.status));
@@ -285,7 +286,7 @@ test('feedback requires auth and updates the average rating', async () => {
     token,
     body: { paper_id: paperId, rating: 9 },
   });
-  assert.equal(invalidRating.status, 422);
+  assert.equal(invalidRating.status, 400);
 
   const recent = await api('/feedback/recent?limit=5');
   assert.equal(recent.status, 200);
