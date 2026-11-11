@@ -9,6 +9,8 @@ export interface DriveFolder {
   label: string | null;
   is_default: boolean;
   updated_at?: string;
+  /** 'builtin' when the server served its fallback list (no database yet). */
+  source?: string;
 }
 
 export interface DriveResolution {
