@@ -74,7 +74,7 @@ export const DEFAULT_BRANCH_FOLDERS = [
     branch: 'Robotics & Automation',
     slug: 'robotics',
     label: 'Robotics & Automation Engineering — All years',
-    drive_link: `${DRIVE_FOLDER_BASE}/1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG71`,
+    drive_link: `${DRIVE_FOLDER_BASE}/1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG7`,
   },
 ];
 

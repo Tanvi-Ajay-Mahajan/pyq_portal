@@ -62,7 +62,7 @@ test('offline branch folders', async (t) => {
       'E & CE': '1RNvEYcduwXcbK3np2tL0k0lFK1bYIkYE',
       IT: '1_r4aaWaDHKVrg2RBJ_udiCSh59JRhCG-',
       Mechanical: '1d_y0hi2frgdVLzNJodqnLv1rsVB4R1LT',
-      'Robotics & Automation': '1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG71',
+      'Robotics & Automation': '1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG7',
     };
 
     for (const [branch, folderId] of Object.entries(expectedLinks)) {
@@ -102,7 +102,7 @@ test('offline branch folders', async (t) => {
       ['E & CE', '1RNvEYcduwXcbK3np2tL0k0lFK1bYIkYE'],
       ['IT', '1_r4aaWaDHKVrg2RBJ_udiCSh59JRhCG-'],
       ['Mechanical', '1d_y0hi2frgdVLzNJodqnLv1rsVB4R1LT'],
-      ['Robotics & Automation', '1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG71'],
+      ['Robotics & Automation', '1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG7'],
       // Papers label this branch 'E & TC'; it must resolve to the ENTC folder.
       ['E & TC', '11anFaTKjfcrS3NpMJCE7-DcX6UUaMlY_'],
     ];
