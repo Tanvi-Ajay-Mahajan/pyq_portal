@@ -37,7 +37,6 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-1">
           <Link to="/" className={navLinkClass('/')}>Home</Link>
           <Link to="/browse" className={navLinkClass('/browse')}>Browse Papers</Link>
-          <Link to="/branches" className={navLinkClass('/branches')}>Branches</Link>
           {session && (
             <Link to="/dashboard" className={navLinkClass('/dashboard')}>
               <span className="inline-flex items-center gap-1.5">
@@ -91,7 +90,6 @@ export default function Navbar() {
         <div className="md:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1 animate-fade-in">
           <Link to="/" onClick={() => setMobileOpen(false)} className="block px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">Home</Link>
           <Link to="/browse" onClick={() => setMobileOpen(false)} className="block px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">Browse Papers</Link>
-          <Link to="/branches" onClick={() => setMobileOpen(false)} className="block px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">Branches</Link>
           {session && (
             <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
               <LayoutDashboard className="w-4 h-4" /> Dashboard

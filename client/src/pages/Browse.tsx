@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchPapers } from '@/services/paperService';
-import { fetchDriveFolders } from '@/services/driveService';
+import { fetchDriveFolders, type DriveFolder } from '@/services/driveService';
 import { useAuth } from '@/context/AuthContext';
 import type { PyqPaper, YearLevel } from '@/types';
 import { buildDriveIndex, getBranchDriveLink, mergeWithDriveBranches, type DriveIndex } from '@/lib/branchDriveLinks';
@@ -18,7 +18,7 @@ const YEAR_LEVELS: { key: YearLevel; label: string; full: string; color: string;
   { key: 'BE', label: 'BE', full: 'Final Year Engineering', color: 'from-rose-500 to-rose-700', bg: 'bg-rose-50', text: 'text-rose-700' },
 ];
 
-type Step = 'year' | 'branch' | 'papers';
+type Step = 'year' | 'fe' | 'branch' | 'papers';
 
 export default function Browse() {
   const { session } = useAuth();
@@ -31,6 +31,7 @@ export default function Browse() {
   const [selectedPaper, setSelectedPaper] = useState<PyqPaper | null>(null);
   const [ratingCounts, setRatingCounts] = useState<Record<string, { avg: number; count: number }>>({});
   const [driveIndex, setDriveIndex] = useState<DriveIndex>({ byBranch: new Map() });
+  const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
 
   // Initialize from URL params
   useEffect(() => {
@@ -72,7 +73,9 @@ export default function Browse() {
     let cancelled = false;
     fetchDriveFolders()
       .then((folders) => {
-        if (!cancelled) setDriveIndex(buildDriveIndex(folders));
+        if (cancelled) return;
+        setDriveFolders(folders);
+        setDriveIndex(buildDriveIndex(folders));
       })
       .catch(() => {
         if (!cancelled) setDriveIndex({ byBranch: new Map() });
@@ -125,7 +128,24 @@ export default function Browse() {
     return mergeWithDriveBranches(branches, driveIndex);
   }, [allPapers, selectedYear, driveIndex]);
 
-  const currentStep: Step = !selectedYear ? 'year' : selectedYear === 'FE' || (!selectedBranch && branchesForYear.length > 0) ? 'branch' : 'papers';
+  // FE is not a branch: it only offers the year-level FE folder and the FE 2024 PDF.
+  const currentStep: Step = !selectedYear
+    ? 'year'
+    : selectedYear === 'FE'
+      ? 'fe'
+      : !selectedBranch && branchesForYear.length > 0
+        ? 'branch'
+        : 'papers';
+
+  const feFolderLink = useMemo(() => {
+    const folder = driveFolders.find((item) => item.year_level === 'FE' && item.kind !== 'document');
+    return folder?.drive_link ?? null;
+  }, [driveFolders]);
+
+  const feDocumentLink = useMemo(() => {
+    const document = driveFolders.find((item) => item.year_level === 'FE' && item.kind === 'document');
+    return document?.drive_link ?? null;
+  }, [driveFolders]);
 
   // For FE: show papers directly (no branch). For SE/TE/BE: filter by branch.
   const visiblePapers = useMemo(() => {
@@ -179,7 +199,44 @@ export default function Browse() {
     );
   }
 
-  // ---------- STEP 2: Branch selection (SE/TE/BE) ----------
+  // ---------- STEP 2: First year links (FE Drive folder + FE 2024 PDF) ----------
+  if (currentStep === 'fe') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 animate-fade-in">
+        <Breadcrumb year={selectedYear} yearMeta={yearMeta} onBackYear={goBackToYear} />
+
+        <div className="mb-8">
+          <h1 className="font-display text-3xl font-bold text-slate-900 mb-1.5">First Year (FE)</h1>
+          <p className="text-slate-500">
+            First-year material is the same for every branch. Each link opens directly in a new tab.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-5 max-w-3xl">
+          <YearLinkCard
+            href={feFolderLink}
+            label="FE"
+            caption="First Year (all branches)"
+            cta="Open Drive folder"
+            bg="bg-sky-50"
+            text="text-sky-700"
+            icon={<Folder className="w-7 h-7" />}
+          />
+          <YearLinkCard
+            href={feDocumentLink}
+            label="FE 2024"
+            caption="SPPU exam circular (PDF)"
+            cta="Open PDF"
+            bg="bg-indigo-50"
+            text="text-indigo-700"
+            icon={<FileText className="w-7 h-7" />}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- STEP 3: Branch selection (SE/TE/BE) ----------
   if (currentStep === 'branch') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 animate-fade-in">
@@ -367,6 +424,52 @@ export default function Browse() {
         </div>
       )}
     </div>
+  );
+}
+
+// ---------- Year-level link card: FE Drive folder / FE 2024 PDF ----------
+function YearLinkCard({
+  href,
+  label,
+  caption,
+  cta,
+  bg,
+  text,
+  icon,
+}: {
+  href: string | null;
+  label: string;
+  caption: string;
+  cta: string;
+  bg: string;
+  text: string;
+  icon: ReactNode;
+}) {
+  const inner = (
+    <>
+      <div className={`w-14 h-14 rounded-2xl ${bg} ${text} flex items-center justify-center mb-4`}>{icon}</div>
+      <p className="font-display font-bold text-slate-900">{label}</p>
+      <p className="text-xs text-slate-400 mt-1">{caption}</p>
+      <span className={`mt-4 badge ${bg} ${text} group-hover:gap-2 transition-all`}>
+        {cta} <ExternalLink className="w-3 h-3" />
+      </span>
+    </>
+  );
+
+  if (!href) {
+    return <div className="card p-6 flex flex-col items-center text-center opacity-60">{inner}</div>;
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${label} — ${cta}`}
+      className="card p-6 flex flex-col items-center text-center hover:shadow-lg hover:-translate-y-0.5 transition-all group"
+    >
+      {inner}
+    </a>
   );
 }
 
