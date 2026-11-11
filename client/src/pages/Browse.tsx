@@ -158,7 +158,6 @@ export default function Browse() {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           {YEAR_LEVELS.map((y) => {
-            const count = allPapers.filter((p) => p.year_level === y.key).length;
             return (
               <button
                 key={y.key}
@@ -169,7 +168,6 @@ export default function Browse() {
                   {y.label}
                 </div>
                 <p className="font-semibold text-slate-900">{y.full}</p>
-                <p className="text-xs text-slate-400 mt-1">{count} papers available</p>
                 <span className={`mt-4 badge ${y.bg} ${y.text} group-hover:gap-2 transition-all`}>
                   Browse <ChevronRight className="w-3 h-3" />
                 </span>
@@ -196,12 +194,10 @@ export default function Browse() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {branchesForYear.map((branch) => {
-            const count = allPapers.filter((p) => p.year_level === selectedYear && p.branch === branch).length;
             return (
               <BranchCard
                 key={branch}
                 branch={branch}
-                count={count}
                 yearMeta={yearMeta}
                 driveIndex={driveIndex}
                 onSelect={() => selectBranch(branch)}
@@ -377,13 +373,11 @@ export default function Browse() {
 // ---------- Branch card: opens the branch's Google Drive folder ----------
 function BranchCard({
   branch,
-  count,
   yearMeta,
   driveIndex,
   onSelect,
 }: {
   branch: string;
-  count: number;
   yearMeta?: { bg: string; text: string };
   driveIndex: DriveIndex;
   onSelect: () => void;
@@ -398,8 +392,7 @@ function BranchCard({
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-slate-900 truncate">{branch}</p>
         <p className="text-xs text-slate-400">
-          {count} paper{count !== 1 ? 's' : ''}
-          {driveLink ? ' · Opens Google Drive' : ''}
+          {driveLink ? 'Opens Google Drive' : 'Browse papers'}
         </p>
       </div>
       {driveLink ? (
