@@ -1,6 +1,6 @@
 /**
  * Verifies the branch Drive browser works with NO database configured, which is
- * the deployed state until MONGODB_URI is set. The four branch folders must be
+ * the deployed state until MONGODB_URI is set. Every branch folder must be
  * served read-only from server/config/defaultDriveFolders.js, while writes and
  * paper queries keep returning a clear 503 instead of hanging or faking data.
  */
@@ -37,7 +37,12 @@ test('offline branch folders', async (t) => {
       'AIML',
       'Civil',
       'Computer',
+      'E & CE',
+      'ENTC',
       'Electrical',
+      'IT',
+      'Mechanical',
+      'Robotics & Automation',
     ]);
 
     for (const folder of branchFolders) {
@@ -47,11 +52,27 @@ test('offline branch folders', async (t) => {
       assert.equal(folder.kind, 'folder');
     }
 
-    const aiml = branchFolders.find((folder) => folder.branch === 'AIML');
-    assert.equal(
-      aiml.drive_link,
-      'https://drive.google.com/drive/folders/1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB'
-    );
+    // Every supplied branch keeps its own exact Drive folder.
+    const expectedLinks = {
+      AIML: '16qpRY6eoaNqt79VpPCJV82Mtq3cO-ago',
+      Civil: '1U8N82pIk_Aihd9zO0ibplfKknZisTOeA',
+      Computer: '1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH',
+      Electrical: '1SIgkt4Dhovn0cakRY6vCFYHVkGGqsbjn',
+      ENTC: '11anFaTKjfcrS3NpMJCE7-DcX6UUaMlY_',
+      'E & CE': '1RNvEYcduwXcbK3np2tL0k0lFK1bYIkYE',
+      IT: '1_r4aaWaDHKVrg2RBJ_udiCSh59JRhCG-',
+      Mechanical: '1d_y0hi2frgdVLzNJodqnLv1rsVB4R1LT',
+      'Robotics & Automation': '1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG71',
+    };
+
+    for (const [branch, folderId] of Object.entries(expectedLinks)) {
+      const folder = branchFolders.find((item) => item.branch === branch);
+      assert.ok(folder, `expected a Drive folder for ${branch}`);
+      assert.ok(
+        folder.drive_link.endsWith(`/folders/${folderId}`),
+        `${branch} points at ${folder.drive_link}`
+      );
+    }
 
     // FE is a year-level link, not a branch.
     const feFolder = body.find((folder) => folder.year_level === 'FE' && folder.kind !== 'document');
@@ -73,10 +94,17 @@ test('offline branch folders', async (t) => {
 
   await t.test('GET /api/drive-folders/resolve resolves per branch and year', async () => {
     const cases = [
-      ['AIML', '1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB'],
+      ['AIML', '16qpRY6eoaNqt79VpPCJV82Mtq3cO-ago'],
       ['Civil', '1U8N82pIk_Aihd9zO0ibplfKknZisTOeA'],
       ['Computer', '1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH'],
       ['Electrical', '1SIgkt4Dhovn0cakRY6vCFYHVkGGqsbjn'],
+      ['ENTC', '11anFaTKjfcrS3NpMJCE7-DcX6UUaMlY_'],
+      ['E & CE', '1RNvEYcduwXcbK3np2tL0k0lFK1bYIkYE'],
+      ['IT', '1_r4aaWaDHKVrg2RBJ_udiCSh59JRhCG-'],
+      ['Mechanical', '1d_y0hi2frgdVLzNJodqnLv1rsVB4R1LT'],
+      ['Robotics & Automation', '1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG71'],
+      // Papers label this branch 'E & TC'; it must resolve to the ENTC folder.
+      ['E & TC', '11anFaTKjfcrS3NpMJCE7-DcX6UUaMlY_'],
     ];
 
     for (const [branch, folderId] of cases) {
@@ -98,10 +126,10 @@ test('offline branch folders', async (t) => {
     const aliasBody = await alias.json();
     assert.ok(aliasBody.drive_link.endsWith('1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH'));
 
-    const missing = await fetch(`${base}/api/drive-folders/resolve?branch=Mechanical`);
+    const missing = await fetch(`${base}/api/drive-folders/resolve?branch=Instrumentation`);
     assert.equal(missing.status, 404);
     const missingText = await missing.text();
-    assert.match(missingText, /Mechanical/);
+    assert.match(missingText, /Instrumentation/);
   });
 
   await t.test('database-backed endpoints stay honest at 503', async () => {
