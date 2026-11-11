@@ -1,4 +1,12 @@
-import { AlertTriangle, Database, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Database, ExternalLink, Folder } from 'lucide-react';
+import { BRANCH_DRIVE_LINKS } from '@/lib/branchDriveLinks';
+
+const BRANCH_LINKS: { key: keyof typeof BRANCH_DRIVE_LINKS; label: string }[] = [
+  { key: 'AIML', label: 'AIML' },
+  { key: 'CIVIL', label: 'Civil' },
+  { key: 'COMPUTER', label: 'Computer' },
+  { key: 'ELECTRICAL', label: 'Electrical' },
+];
 
 export default function ConfigError() {
   return (
@@ -35,6 +43,29 @@ export default function ConfigError() {
                 <span>Paste both values into the chat and I'll create the connection file for you immediately.</span>
               </li>
             </ol>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-5 text-left mb-6">
+            <h2 className="font-semibold text-slate-800 text-sm mb-3 flex items-center gap-2">
+              <Folder className="w-4 h-4 text-primary-600" /> Branch paper folders
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
+              {BRANCH_LINKS.map((branch) => (
+                <a
+                  key={branch.key}
+                  href={BRANCH_DRIVE_LINKS[branch.key]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                >
+                  <span>{branch.label}</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-primary-600" />
+                </a>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 mt-2 text-left">
+              Each branch opens its Google Drive folder with the papers inside.
+            </p>
           </div>
 
           <a
