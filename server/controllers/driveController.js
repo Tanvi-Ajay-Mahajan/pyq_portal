@@ -25,9 +25,17 @@ const byNewestPattern = (a, b) => patternRank(b.pattern) - patternRank(a.pattern
  *  2. exact year + branch, newest pattern
  *  3. branch-wide folder (year_level: 'ALL'), newest pattern
  */
-function pickFolder(candidates, { yearLevel, branchKey, pattern }) {
-  const forBranch = candidates.filter((doc) => normalizeBranchKey(doc.branch) === branchKey);
-  if (forBranch.length === 0) return null;
+function pickFolder(candidates, { yearLevel, branchKey, branchName, pattern }) {
+  const aliasMatches = candidates.filter((doc) => normalizeBranchKey(doc.branch) === branchKey);
+  if (aliasMatches.length === 0) return null;
+
+  // Prefer the exact branch spelling that was requested so a near-duplicate
+  // alias entry ('Computer' vs 'COMPUTER') cannot shadow the correct link.
+  const wanted = String(branchName || '').trim().toLowerCase();
+  const exactBranch = wanted
+    ? aliasMatches.filter((doc) => String(doc.branch).trim().toLowerCase() === wanted)
+    : [];
+  const forBranch = exactBranch.length > 0 ? exactBranch : aliasMatches;
 
   if (pattern) {
     const exactPattern = forBranch.find(
@@ -71,7 +79,7 @@ export const resolveDriveFolder = asyncHandler(async (req, res) => {
       : {}
   );
 
-  const picked = pickFolder(candidates, { yearLevel, branchKey, pattern });
+  const picked = pickFolder(candidates, { yearLevel, branchKey, branchName, pattern });
 
   if (!picked) {
     // Nothing stored yet — fall back to the newest paper link for this branch.
@@ -121,11 +129,14 @@ export const createDriveFolder = asyncHandler(async (req, res) => {
     ? normalizeYearLevel(req.body.year_level) || DRIVE_FOLDER_ALL_YEARS
     : DRIVE_FOLDER_ALL_YEARS;
 
-  const existing = await DriveFolder.findOne({
-    year_level: yearLevel,
-    branch: String(branch).trim(),
-    pattern: String(pattern).trim(),
-  });
+  const branchRaw = String(branch).trim();
+  const patternRaw = String(pattern).trim();
+  const branchKey = normalizeBranchKey(branchRaw);
+
+  // Match on the branch alias key so 'Computer' and 'COMPUTER' update a single
+  // row instead of creating two competing Drive folders for the same branch.
+  const siblings = await DriveFolder.find({ year_level: yearLevel, pattern: patternRaw });
+  const existing = siblings.find((doc) => normalizeBranchKey(doc.branch) === branchKey);
   if (existing) {
     existing.drive_link = String(drive_link).trim();
     existing.label = label ? String(label).trim() : existing.label;
@@ -136,8 +147,8 @@ export const createDriveFolder = asyncHandler(async (req, res) => {
 
   const folder = await DriveFolder.create({
     year_level: yearLevel,
-    branch: String(branch).trim(),
-    pattern: String(pattern).trim(),
+    branch: branchRaw,
+    pattern: patternRaw,
     drive_link: String(drive_link).trim(),
     label: label ? String(label).trim() : null,
     is_default: Boolean(is_default),
