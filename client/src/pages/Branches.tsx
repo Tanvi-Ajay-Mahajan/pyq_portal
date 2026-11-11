@@ -119,7 +119,7 @@ export default function Branches() {
           key,
           name: folder.branch,
           description: meta?.description ?? 'Engineering branch',
-          driveLink: getBranchDriveLink(index, folder.branch, year === 'ALL' ? null : year),
+          driveLink: getBranchDriveLink(index, folder.branch, year === 'ALL' ? undefined : year),
           years: Array.from(new Set(years)),
           builtin: folder.source === 'builtin',
         });

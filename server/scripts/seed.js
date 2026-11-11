@@ -175,40 +175,14 @@ export const PAPERS = [
  * Civil, Computer and Electrical. Stored in MongoDB so branch clicks resolve
  * through the API instead of hardcoded frontend constants.
  */
-export const BRANCH_WIDE_FOLDERS = [
-  {
-    year_level: 'ALL',
-    branch: 'AIML',
-    pattern: '2024',
-    drive_link: `${G}/1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB`,
-    label: 'AIML — All years',
-    is_default: true,
-  },
-  {
-    year_level: 'ALL',
-    branch: 'Civil',
-    pattern: '2024',
-    drive_link: `${G}/1U8N82pIk_Aihd9zO0ibplfKknZisTOeA`,
-    label: 'Civil — All years',
-    is_default: true,
-  },
-  {
-    year_level: 'ALL',
-    branch: 'Computer',
-    pattern: '2024',
-    drive_link: `${G}/1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH`,
-    label: 'Computer — All years',
-    is_default: true,
-  },
-  {
-    year_level: 'ALL',
-    branch: 'Electrical',
-    pattern: '2024',
-    drive_link: `${G}/1SIgkt4Dhovn0cakRY6vCFYHVkGGqsbjn`,
-    label: 'Electrical — All years',
-    is_default: true,
-  },
-];
+export const BRANCH_WIDE_FOLDERS = DEFAULT_BRANCH_FOLDERS.map((folder) => ({
+  year_level: 'ALL',
+  branch: folder.branch,
+  pattern: '2024',
+  drive_link: folder.drive_link,
+  label: folder.label,
+  is_default: true,
+}));
 
 /** Year + pattern specific branch folders (derived from the existing SE/TE/BE records). */
 export const YEAR_PATTERN_FOLDERS = PAPERS.filter((paper) => paper.branch && paper.pattern).map(
