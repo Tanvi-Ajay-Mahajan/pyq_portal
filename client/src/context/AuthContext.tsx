@@ -1,141 +1,149 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabaseClient';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Profile, UserRole } from '@/types';
+import { UNAUTHORIZED_EVENT, getToken, setToken } from '@/lib/api';
+import {
+  fetchCurrentUser,
+  loginUser,
+  logoutUser,
+  registerUser,
+  type AuthUser,
+} from '@/services/authService';
+
+interface Session {
+  user: { id: string; email: string };
+  token: string;
+}
 
 interface AuthContextValue {
   session: Session | null;
-  user: User | null;
   profile: Profile | null;
   role: UserRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const toProfile = (user: AuthUser): Profile => ({
+  id: user.id,
+  full_name: user.name,
+  role: user.role,
+  created_at: user.created_at,
+});
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setTokenState] = useState<string | null>(() => getToken());
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, role, created_at')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) {
-      console.error('Failed to load profile:', error.message);
-      setProfile(null);
-      return;
-    }
-    setProfile(data as Profile | null);
+  const applySession = useCallback((nextToken: string | null, nextUser: AuthUser | null) => {
+    setToken(nextToken);
+    setTokenState(nextToken);
+    setUser(nextUser);
   }, []);
 
+  // Restore the session from the stored JWT on first load.
   useEffect(() => {
-    let mounted = true;
+    let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      if (data.session?.user) {
-        loadProfile(data.session.user.id).finally(() => mounted && setLoading(false));
-      } else {
-        setLoading(false);
+    const restore = async () => {
+      const stored = getToken();
+      if (!stored) {
+        if (active) setLoading(false);
+        return;
       }
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      if (newSession?.user) {
-        (async () => {
-          await loadProfile(newSession.user.id);
-          setLoading(false);
-        })();
-      } else {
-        setProfile(null);
-        setLoading(false);
+      try {
+        const current = await fetchCurrentUser();
+        if (active) {
+          setUser(current);
+          setTokenState(stored);
+        }
+      } catch {
+        if (active) {
+          setToken(null);
+          setTokenState(null);
+          setUser(null);
+        }
+      } finally {
+        if (active) setLoading(false);
       }
-    });
-
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
     };
-  }, [loadProfile]);
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      if (error) {
-        if (error.message.includes('Invalid login')) return { error: 'Incorrect email or password. Please try again.' };
-        if (error.message.includes('Email not confirmed')) return { error: 'Please confirm your email before signing in.' };
-        if (error.message.includes('rate limit') || error.message.includes('too many')) return { error: 'Too many attempts. Please wait a moment and try again.' };
-        return { error: 'Could not sign in. Please check your connection and try again.' };
-      }
-      return { error: null };
-    } catch {
-      return { error: 'Network error. Please check your connection.' };
+    restore();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // A rejected token anywhere in the app clears the session once.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setToken(null);
+      setTokenState(null);
+      setUser(null);
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const result = await loginUser({ email, password });
+      applySession(result.token, result.user);
+    },
+    [applySession],
+  );
+
+  const signUp = useCallback(
+    async (name: string, email: string, password: string) => {
+      const result = await registerUser({ name, email, password });
+      applySession(result.token, result.user);
+    },
+    [applySession],
+  );
+
+  const signOut = useCallback(async () => {
+    await logoutUser();
+    applySession(null, null);
+  }, [applySession]);
+
+  const refresh = useCallback(async () => {
+    if (!getToken()) {
+      applySession(null, null);
+      return;
     }
-  };
-
-  const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: { data: { full_name: fullName.trim() } },
-      });
-      if (error) {
-        if (error.message.includes('already registered') || error.message.includes('already been registered')) return { error: 'This email is already registered. Try signing in instead.' };
-        if (error.message.includes('rate limit') || error.message.includes('too many')) return { error: 'Too many attempts. Please wait a moment and try again.' };
-        if (error.message.includes('password')) return { error: 'Password must be at least 6 characters.' };
-        return { error: 'Could not create account. Please try again.' };
-      }
-      if (data.user) {
-        await loadProfile(data.user.id);
-      }
-      return { error: null };
+      setUser(await fetchCurrentUser());
     } catch {
-      return { error: 'Network error. Please check your connection.' };
+      applySession(null, null);
     }
-  };
+  }, [applySession]);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
-    setSession(null);
-  };
-
-  const refreshProfile = async () => {
-    if (session?.user) await loadProfile(session.user.id);
-  };
-
-  const value: AuthContextValue = {
-    session,
-    user: session?.user ?? null,
-    profile,
-    role: profile?.role ?? null,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    refreshProfile,
-  };
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session: token && user ? { user: { id: user.id, email: user.email }, token } : null,
+      profile: user ? toProfile(user) : null,
+      role: user?.role ?? null,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      refresh,
+    }),
+    [token, user, loading, signIn, signUp, signOut, refresh],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
