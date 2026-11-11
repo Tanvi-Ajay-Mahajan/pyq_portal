@@ -1,5 +1,7 @@
 import DriveFolder from '../models/DriveFolder.js';
 import Paper from '../models/Paper.js';
+import { isDbConnected } from '../config/db.js';
+import { DEFAULT_BRANCH_FOLDERS } from '../config/defaultDriveFolders.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { toDriveFolder } from '../utils/serialize.js';
@@ -18,6 +20,23 @@ const patternRank = (pattern) => {
 };
 
 const byNewestPattern = (a, b) => patternRank(b.pattern) - patternRank(a.pattern);
+
+/**
+ * The built-in branch folders shaped like DriveFolder documents.
+ *
+ * Used only while no database is connected: the four branch links stay on the
+ * server (never in the client bundle) and are served read-only so the branch
+ * file browser works before MONGODB_URI is configured. `_id` is present so the
+ * shared serializer produces a stable `id` for the client.
+ */
+const builtinFolders = () =>
+  DEFAULT_BRANCH_FOLDERS.map(({ slug, ...folder }) => ({
+    _id: `builtin-${slug}`,
+    year_level: DRIVE_FOLDER_ALL_YEARS,
+    pattern: '2024',
+    is_default: true,
+    ...folder,
+  }));
 
 /**
  * Picks the best Drive folder for a year + branch + optional pattern:
@@ -79,6 +98,22 @@ export const resolveDriveFolder = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('year_level must be one of FE, SE, TE or BE');
   }
 
+  if (!isDbConnected()) {
+    const picked = pickFolder(builtinFolders(), { yearLevel, branchKey, branchName, pattern });
+    if (!picked) {
+      throw ApiError.notFound(
+        `No Google Drive folder is configured for the ${branchName} branch yet`
+      );
+    }
+    return res.json({
+      ...toDriveFolder(picked.doc),
+      branch: picked.doc.branch,
+      match: picked.match,
+      requested_branch: branchName,
+      source: 'builtin',
+    });
+  }
+
   const candidates = await DriveFolder.find(
     yearLevel
       ? { $or: [{ year_level: yearLevel }, { year_level: DRIVE_FOLDER_ALL_YEARS }] }
@@ -123,6 +158,15 @@ export const listDriveFolders = asyncHandler(async (req, res) => {
     filter.year_level = normalized || req.query.year_level;
   }
   if (req.query.branch) filter.branch = req.query.branch;
+
+  if (!isDbConnected()) {
+    const folders = builtinFolders().filter((folder) => {
+      if (filter.year_level && folder.year_level !== filter.year_level) return false;
+      if (filter.branch && folder.branch !== filter.branch) return false;
+      return true;
+    });
+    return res.json(folders.map((folder) => ({ ...toDriveFolder(folder), source: 'builtin' })));
+  }
 
   const folders = await DriveFolder.find(filter).sort({ branch: 1, pattern: -1 });
   res.json(folders.map(toDriveFolder));

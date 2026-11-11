@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createApp } from '../app.js';
+import { createApp } from '../server.js';
 import { isDbConnected } from '../config/db.js';
 import { DEFAULT_BRANCH_FOLDERS } from '../config/defaultDriveFolders.js';
 
