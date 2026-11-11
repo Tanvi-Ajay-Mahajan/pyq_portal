@@ -20,48 +20,51 @@ export default function Home() {
   const [driveIndex, setDriveIndex] = useState<DriveIndex>({ byBranch: new Map() });
 
   useEffect(() => {
-    supabase.from('pyq_papers').select('*', { count: 'exact', head: true }).then(
-      ({ count }) => setPaperCount(count ?? 0),
-    );
-    supabase.from('subjects').select('id', { count: 'exact', head: true }).then(
-      ({ count }) => setSubjectCount(count ?? 0),
-    );
-    supabase.from('pyq_papers').select('*').order('created_at', { ascending: true }).then(
-      ({ data }) => setAllPapers((data ?? []) as PyqPaper[]),
-    );
-    // Fetch top-rated papers
-    supabase
-      .from('pyq_feedback')
-      .select('paper_id, rating')
-      .then(({ data: rows }) => {
-        if (!rows || rows.length === 0) return;
-        const map: Record<string, { sum: number; count: number }> = {};
-        for (const r of rows as { paper_id: string; rating: number }[]) {
-          if (!map[r.paper_id]) map[r.paper_id] = { sum: 0, count: 0 };
-          map[r.paper_id].sum += r.rating;
-          map[r.paper_id].count += 1;
-        }
-        const sorted = Object.entries(map)
-          .map(([pid, v]) => ({ paper_id: pid, avg: v.sum / v.count, count: v.count }))
+    let cancelled = false;
+
+    fetchStats()
+      .then((stats) => {
+        if (cancelled) return;
+        setPaperCount(stats.total_papers ?? 0);
+        setSubjectCount(stats.total_subjects ?? 0);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPaperCount(0);
+        setSubjectCount(0);
+      });
+
+    fetchPapers()
+      .then((rows) => {
+        if (cancelled) return;
+        const papers = rows as (PyqPaper & { rating_average?: number; rating_count?: number })[];
+        setAllPapers(papers);
+        const ranked = papers
+          .map((paper) => ({
+            paper,
+            avg: paper.rating_average ?? 0,
+            count: paper.rating_count ?? 0,
+          }))
+          .filter((entry) => entry.count > 0)
           .sort((a, b) => b.avg - a.avg || b.count - a.count)
           .slice(0, 4);
-        if (sorted.length === 0) return;
-        supabase
-          .from('pyq_papers')
-          .select('*')
-          .in('id', sorted.map((s) => s.paper_id))
-          .then(({ data: papers }) => {
-            if (!papers) return;
-            const ranked = (papers as PyqPaper[])
-              .map((p) => {
-                const meta = sorted.find((s) => s.paper_id === p.id);
-                return meta ? { paper: p, avg: meta.avg, count: meta.count } : null;
-              })
-              .filter((x): x is { paper: PyqPaper; avg: number; count: number } => x !== null)
-              .sort((a, b) => b.avg - a.avg || b.count - a.count);
-            setTopPapers(ranked);
-          });
+        setTopPapers(ranked);
+      })
+      .catch(() => {
+        if (!cancelled) setAllPapers([]);
       });
+
+    fetchDriveFolders()
+      .then((folders) => {
+        if (!cancelled) setDriveIndex(buildDriveIndex(folders));
+      })
+      .catch(() => {
+        if (!cancelled) setDriveIndex({ byBranch: new Map() });
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Count distinct branches across all papers
@@ -315,10 +318,11 @@ export default function Home() {
             {(() => {
               const branches = mergeWithDriveBranches(
                 allPapers.filter((p) => p.branch).map((p) => p.branch as string),
+                driveIndex,
               );
               return branches.map((branch) => {
                 const count = allPapers.filter((p) => p.branch === branch).length;
-                const driveLink = getBranchDriveLink(branch);
+                const driveLink = getBranchDriveLink(driveIndex, branch);
                 const cardInner = (
                   <>
                     <div className="w-12 h-12 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white transition-colors">
