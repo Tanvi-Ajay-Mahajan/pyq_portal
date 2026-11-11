@@ -1,7 +1,11 @@
 import { useEffect, useState, useCallback, type FormEvent, type ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/context/ToastContext';
 import type { PyqPaper, YearLevel } from '@/types';
+import { createPaper, deletePaper, fetchPapers, updatePaper } from '@/services/paperService';
+import {
+  deleteFeedback as deleteFeedbackRequest,
+  fetchRecentFeedback,
+} from '@/services/feedbackService';
 import {
   FileText, Plus, Pencil, Trash2, X, Loader2, Search,
   ExternalLink, ShieldCheck, Star,
@@ -38,18 +42,14 @@ export default function Admin() {
 
   const loadPapers = useCallback(async () => {
     setLoading(true);
-    const { data: rows, error } = await supabase
-      .from('pyq_papers')
-      .select('*')
-      .order('year_level', { ascending: true })
-      .order('pattern', { ascending: false });
-    if (error) {
-      notify('error', 'Failed to load papers: ' + error.message);
+    try {
+      setPapers(await fetchPapers());
+    } catch (err) {
+      notify('error', 'Failed to load papers: ' + (err instanceof Error ? err.message : 'Unknown error'));
       setPapers([]);
-    } else {
-      setPapers((rows ?? []) as PyqPaper[]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [notify]);
 
   useEffect(() => { loadPapers(); }, [loadPapers]);
@@ -95,26 +95,30 @@ export default function Admin() {
       subject_name: editing.subject_name.trim() || null,
       drive_link: editing.drive_link.trim(),
     };
-    let error;
-    if (editing.id) {
-      ({ error } = await supabase.from('pyq_papers').update(payload).eq('id', editing.id));
-    } else {
-      ({ error } = await supabase.from('pyq_papers').insert(payload));
-    }
-    setSaving(false);
-    if (error) {
-      notify('error', error.message.includes('row-level security') ? 'Permission denied. Admin access required.' : error.message);
+    try {
+      if (editing.id) {
+        await updatePaper(editing.id, payload);
+      } else {
+        await createPaper(payload);
+      }
+    } catch (err) {
+      setSaving(false);
+      const message = err instanceof Error ? err.message : 'Could not save paper.';
+      notify('error', /forbidden|admin/i.test(message) ? 'Permission denied. Admin access required.' : message);
       return;
     }
+    setSaving(false);
     notify('success', editing.id ? 'Paper updated successfully.' : 'Paper added successfully.');
     closeModal();
     loadPapers();
   };
 
   const handleDeletePaper = async (id: string) => {
-    const { error } = await supabase.from('pyq_papers').delete().eq('id', id);
-    if (error) {
-      notify('error', error.message.includes('row-level security') ? 'Permission denied.' : error.message);
+    try {
+      await deletePaper(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not delete paper.';
+      notify('error', /forbidden|admin/i.test(message) ? 'Permission denied.' : message);
       return;
     }
     notify('success', 'Paper deleted.');
@@ -127,19 +131,26 @@ export default function Admin() {
 
   useEffect(() => {
     if (tab !== 'feedback') return;
-    supabase
-      .from('pyq_feedback')
-      .select('id, rating, comment, created_at, paper:pyq_papers(subject_name, branch, year_level), user:profiles(full_name)')
-      .order('created_at', { ascending: false })
-      .limit(100)
-      .then(({ data }) => {
-        if (data) setFeedback(data as never);
+    let active = true;
+    fetchRecentFeedback(100)
+      .then((rows) => {
+        if (active) setFeedback(rows as never);
+      })
+      .catch(() => {
+        if (active) notify('error', 'Could not load feedback.');
       });
-  }, [tab]);
+    return () => {
+      active = false;
+    };
+  }, [tab, notify]);
 
   const deleteFeedback = async (id: string) => {
-    const { error } = await supabase.from('pyq_feedback').delete().eq('id', id);
-    if (error) { notify('error', 'Could not delete feedback.'); return; }
+    try {
+      await deleteFeedbackRequest(id);
+    } catch {
+      notify('error', 'Could not delete feedback.');
+      return;
+    }
     notify('success', 'Feedback deleted.');
     setFeedback((prev) => prev.filter((f) => f.id !== id));
   };
