@@ -45,7 +45,10 @@ export function getBranchDriveLink(
   branch?: string | null,
   yearLevel?: string | null,
 ): string | null {
-  const folders = index.byBranch.get(normalize(branch));
+  const key = normalize(branch);
+  // A year-level ('ALL') entry is not a branch link.
+  if (!key || key === 'all') return null;
+  const folders = index.byBranch.get(key);
   if (!folders || folders.length === 0) return null;
 
   const yearKey = normalize(yearLevel);
@@ -61,11 +64,15 @@ export function getBranchDriveLink(
 export function mergeWithDriveBranches(branches: string[], index: DriveIndex): string[] {
   const merged = new Set<string>();
   for (const branch of branches) {
-    if (branch) merged.add(branch);
+    if (branch && normalize(branch) !== 'all') merged.add(branch);
   }
   for (const list of index.byBranch.values()) {
     for (const folder of list) {
-      if (folder.branch) merged.add(folder.branch);
+      // 'ALL' marks a year-level link (the FE folder) and documents are single
+      // files — neither is a branch, so they stay out of the branch list.
+      if (!folder.branch || normalize(folder.branch) === 'all') continue;
+      if (folder.kind === 'document') continue;
+      merged.add(folder.branch);
     }
   }
   return Array.from(merged).sort((a, b) => a.localeCompare(b));
