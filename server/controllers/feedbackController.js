@@ -19,7 +19,7 @@ async function summaryForPaper(paperId) {
 /** GET /api/feedback/recent?limit=6 — public "recent feedback" list. */
 export const listRecentFeedback = asyncHandler(async (req, res) => {
   const requested = Number(req.query.limit);
-  const limit = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 50) : 6;
+  const limit = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 100) : 6;
 
   const feedback = await Feedback.find()
     .sort({ createdAt: -1 })
@@ -44,8 +44,24 @@ export const listRecentFeedback = asyncHandler(async (req, res) => {
 
 /** GET /api/feedback/mine */
 export const listMyFeedback = asyncHandler(async (req, res) => {
-  const feedback = await Feedback.find({ user: req.user._id }).sort({ createdAt: -1 });
-  res.json(feedback.map(toFeedback));
+  const feedback = await Feedback.find({ user: req.user._id })
+    .sort({ createdAt: -1 })
+    .populate('paper', 'subject_name branch year_level pattern');
+
+  res.json(
+    feedback.map((entry) => ({
+      ...toFeedback(entry),
+      paper: entry.paper
+        ? {
+            id: entry.paper._id.toString(),
+            subject_name: entry.paper.subject_name,
+            branch: entry.paper.branch,
+            year_level: entry.paper.year_level,
+            pattern: entry.paper.pattern,
+          }
+        : null,
+    }))
+  );
 });
 
 /** POST /api/feedback — authenticated users only. */

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { fetchPapers, fetchStats } from '@/services/paperService';
+import { fetchMyFeedback } from '@/services/feedbackService';
 import type { PyqPaper } from '@/types';
 import {
   FileText, Search, Download, BookOpen, Layers,
@@ -20,35 +21,52 @@ export default function Dashboard() {
   const [myReviews, setMyReviews] = useState<{ id: string; rating: number; comment: string | null; paper: { subject_name: string | null; branch: string | null; year_level: string } | null }[]>([]);
 
   useEffect(() => {
-    supabase.from('pyq_papers').select('*', { count: 'exact', head: true }).then(
-      ({ count }) => setPaperCount(count ?? 0),
-    );
-    supabase
-      .from('pyq_papers')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5)
-      .then(({ data }) => setRecentPapers((data ?? []) as PyqPaper[]));
+    let cancelled = false;
 
-    // Count distinct branches
-    supabase.from('pyq_papers').select('branch').then(({ data }) => {
-      if (!data) return;
-      const branches = new Set((data as { branch: string | null }[]).filter((r) => r.branch).map((r) => r.branch as string));
-      setBranchCount(branches.size);
-    });
+    fetchStats()
+      .then((stats) => {
+        if (!cancelled) setPaperCount(stats.total_papers ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) setPaperCount(0);
+      });
+
+    fetchPapers()
+      .then((papers) => {
+        if (cancelled) return;
+        setRecentPapers([...papers].reverse().slice(0, 5));
+        const branches = new Set(
+          papers.filter((p) => p.branch).map((p) => p.branch as string),
+        );
+        setBranchCount(branches.size);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentPapers([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load my reviews if logged in
   useEffect(() => {
-    supabase
-      .from('pyq_feedback')
-      .select('id, rating, comment, paper:pyq_papers(subject_name, branch, year_level)')
-      .order('created_at', { ascending: false })
-      .limit(5)
-      .then(({ data }) => {
-        if (data) setMyReviews(data as never);
+    if (!profile) {
+      setMyReviews([]);
+      return;
+    }
+    let cancelled = false;
+    fetchMyFeedback()
+      .then((rows) => {
+        if (!cancelled) setMyReviews((rows as never[]).slice(0, 5));
+      })
+      .catch(() => {
+        if (!cancelled) setMyReviews([]);
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
 
   const stats = [
     { label: 'Total Papers', value: paperCount ?? '—', icon: FileText, color: 'bg-primary-50 text-primary-600' },
