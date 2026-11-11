@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
 import type { PyqPaper, YearLevel } from '@/types';
+import { getBranchDriveLink } from '@/lib/branchDriveLinks';
 import PaperFeedback from '@/components/PaperFeedback';
 import {
   ExternalLink, Loader2, FileText, X, ChevronRight, Home as HomeIcon,
@@ -128,6 +129,7 @@ export default function Browse() {
   }, [allPapers, selectedYear, selectedBranch]);
 
   const yearMeta = YEAR_LEVELS.find((y) => y.key === selectedYear);
+  const branchDriveLink = getBranchDriveLink(selectedBranch);
 
   if (loading) {
     return (
@@ -189,20 +191,13 @@ export default function Browse() {
           {branchesForYear.map((branch) => {
             const count = allPapers.filter((p) => p.year_level === selectedYear && p.branch === branch).length;
             return (
-              <button
+              <BranchCard
                 key={branch}
-                onClick={() => selectBranch(branch)}
-                className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-primary-200 transition-all group text-left"
-              >
-                <div className={`w-12 h-12 rounded-xl ${yearMeta?.bg ?? 'bg-primary-50'} ${yearMeta?.text ?? 'text-primary-600'} flex items-center justify-center flex-shrink-0`}>
-                  <Folder className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-900 truncate">{branch}</p>
-                  <p className="text-xs text-slate-400">{count} paper{count !== 1 ? 's' : ''}</p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
-              </button>
+                branch={branch}
+                count={count}
+                yearMeta={yearMeta}
+                onSelect={() => selectBranch(branch)}
+              />
             );
           })}
         </div>
@@ -230,6 +225,16 @@ export default function Browse() {
             ? 'First year papers organized by subject. Click any paper to view details and leave a review.'
             : `${selectedBranch} branch papers. Click any paper to view details and leave a review.`}
         </p>
+        {branchDriveLink && (
+          <a
+            href={branchDriveLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary mt-4 py-2 text-xs"
+          >
+            <ExternalLink className="w-4 h-4" /> Open {selectedBranch} Drive folder
+          </a>
+        )}
       </div>
 
       {visiblePapers.length === 0 ? (
@@ -356,6 +361,69 @@ export default function Browse() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Branch card: opens the branch's Google Drive folder ----------
+function BranchCard({
+  branch,
+  count,
+  yearMeta,
+  onSelect,
+}: {
+  branch: string;
+  count: number;
+  yearMeta?: { bg: string; text: string };
+  onSelect: () => void;
+}) {
+  const driveLink = getBranchDriveLink(branch);
+
+  const inner = (
+    <>
+      <div className={`w-12 h-12 rounded-xl ${yearMeta?.bg ?? 'bg-primary-50'} ${yearMeta?.text ?? 'text-primary-600'} flex items-center justify-center flex-shrink-0`}>
+        <Folder className="w-6 h-6" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-slate-900 truncate">{branch}</p>
+        <p className="text-xs text-slate-400">
+          {count} paper{count !== 1 ? 's' : ''}
+          {driveLink ? ' · Opens Google Drive' : ''}
+        </p>
+      </div>
+      {driveLink ? (
+        <ExternalLink className="w-5 h-5 text-slate-300 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+      ) : (
+        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
+      )}
+    </>
+  );
+
+  return (
+    <div className="card overflow-hidden flex flex-col hover:shadow-md hover:border-primary-200 transition-all">
+      {driveLink ? (
+        <a
+          href={driveLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-5 flex items-center gap-4 group"
+          title={`Open ${branch} papers in Google Drive`}
+        >
+          {inner}
+        </a>
+      ) : (
+        <button onClick={onSelect} className="p-5 flex items-center gap-4 group text-left w-full">
+          {inner}
+        </button>
+      )}
+      {driveLink && (
+        <button
+          onClick={onSelect}
+          className="text-xs font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50/60 border-t border-slate-100 py-2 px-5 text-left transition-colors"
+        >
+          View papers in app
+        </button>
       )}
     </div>
   );

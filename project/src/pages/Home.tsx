@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useState } from 'react';
 import type { PyqPaper, YearLevel } from '@/types';
+import { getBranchDriveLink } from '@/lib/branchDriveLinks';
 import {
   GraduationCap, Search, FileText, Download, ShieldCheck, BookOpen,
   Layers, ArrowRight, Sparkles, Users, FolderTree, Star, Folder,
@@ -313,20 +314,45 @@ export default function Home() {
               const branches = [...new Set(allPapers.filter((p) => p.branch).map((p) => p.branch as string))].sort();
               return branches.map((branch) => {
                 const count = allPapers.filter((p) => p.branch === branch).length;
-                return (
-                  <Link
-                    key={branch}
-                    to="/browse"
-                    className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-primary-200 transition-all group"
-                  >
+                const driveLink = getBranchDriveLink(branch);
+                const cardInner = (
+                  <>
                     <div className="w-12 h-12 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white transition-colors">
                       <Folder className="w-6 h-6" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 truncate">{branch}</p>
-                      <p className="text-xs text-slate-400">{count} papers</p>
+                      <p className="text-xs text-slate-400">
+                        {count} papers{driveLink ? ' · Google Drive' : ''}
+                      </p>
                     </div>
                     <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
+                  </>
+                );
+
+                // Branches with a Drive folder open it directly in a new tab.
+                if (driveLink) {
+                  return (
+                    <a
+                      key={branch}
+                      href={driveLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${branch} papers in Google Drive`}
+                      className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-primary-200 transition-all group"
+                    >
+                      {cardInner}
+                    </a>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={branch}
+                    to={`/browse?branch=${encodeURIComponent(branch)}`}
+                    className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-primary-200 transition-all group"
+                  >
+                    {cardInner}
                   </Link>
                 );
               });
