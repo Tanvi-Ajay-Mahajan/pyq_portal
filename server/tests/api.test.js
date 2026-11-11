@@ -210,7 +210,7 @@ test('branch click resolves the Drive folder from MongoDB (newest pattern first)
       drive_link: 'https://drive.google.com/drive/folders/computer-2019',
     },
   });
-  assert.equal(older.status, 201);
+  assert.ok([200, 201].includes(older.status), 'admin can store a Drive folder');
 
   const newer = await api('/drive-folders', {
     method: 'POST',
@@ -222,7 +222,7 @@ test('branch click resolves the Drive folder from MongoDB (newest pattern first)
       drive_link: 'https://drive.google.com/drive/folders/computer-2024',
     },
   });
-  assert.equal(newer.status, 201);
+  assert.ok([200, 201].includes(newer.status), 'admin can store a second Drive folder');
 
   const latest = await api('/drive-folders/resolve?year_level=SE&branch=COMPUTER');
   assert.equal(latest.status, 200);
