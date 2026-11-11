@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { fetchPaperFeedback } from '@/services/paperService';
+import {
+  deleteFeedback as deleteFeedbackRequest,
+  submitFeedback,
+  updateFeedback,
+} from '@/services/feedbackService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import type { PyqFeedbackWithUser } from '@/types';
@@ -23,15 +28,9 @@ export default function PaperFeedback({ paperId, compact = false }: PaperFeedbac
 
   const loadFeedback = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('pyq_feedback')
-      .select('id, paper_id, user_id, rating, comment, created_at, user:profiles(full_name)')
-      .eq('paper_id', paperId)
-      .order('created_at', { ascending: false });
-    if (error) {
-      setFeedback([]);
-    } else {
-      const rows = (data ?? []) as unknown as PyqFeedbackWithUser[];
+    try {
+      const result = await fetchPaperFeedback(paperId);
+      const rows = result.feedback ?? [];
       setFeedback(rows);
       if (session) {
         const mine = rows.find((f) => f.user_id === session.user.id);
@@ -39,8 +38,12 @@ export default function PaperFeedback({ paperId, compact = false }: PaperFeedbac
           setMyRating(mine.rating);
           setMyComment(mine.comment ?? '');
           setMyFeedbackId(mine.id);
+        } else {
+          setMyFeedbackId(null);
         }
       }
+    } catch {
+      setFeedback([]);
     }
     setLoading(false);
   }, [paperId, session]);
@@ -55,22 +58,23 @@ export default function PaperFeedback({ paperId, compact = false }: PaperFeedbac
     if (!session) { notify('info', 'Sign in to leave feedback.'); return; }
     if (myRating === 0) { notify('error', 'Please select a star rating.'); return; }
     setSubmitting(true);
-    if (myFeedbackId) {
-      const { error } = await supabase
-        .from('pyq_feedback')
-        .update({ rating: myRating, comment: myComment.trim() || null })
-        .eq('id', myFeedbackId);
-      if (error) { notify('error', 'Could not update feedback.'); setSubmitting(false); return; }
-      notify('success', 'Feedback updated.');
-    } else {
-      const { data, error } = await supabase
-        .from('pyq_feedback')
-        .insert({ paper_id: paperId, rating: myRating, comment: myComment.trim() || null })
-        .select('id')
-        .maybeSingle();
-      if (error) { notify('error', 'Could not submit feedback.'); setSubmitting(false); return; }
-      if (data) setMyFeedbackId(data.id);
-      notify('success', 'Thanks for your feedback!');
+    try {
+      if (myFeedbackId) {
+        await updateFeedback(myFeedbackId, { rating: myRating, comment: myComment.trim() || null });
+        notify('success', 'Feedback updated.');
+      } else {
+        const result = await submitFeedback({
+          paper_id: paperId,
+          rating: myRating,
+          comment: myComment.trim() || null,
+        });
+        setMyFeedbackId(result.feedback.id);
+        notify('success', 'Thanks for your feedback!');
+      }
+    } catch (err) {
+      setSubmitting(false);
+      notify('error', err instanceof Error ? err.message : 'Could not save feedback.');
+      return;
     }
     setSubmitting(false);
     loadFeedback();
@@ -78,8 +82,12 @@ export default function PaperFeedback({ paperId, compact = false }: PaperFeedbac
 
   const remove = async () => {
     if (!myFeedbackId) return;
-    const { error } = await supabase.from('pyq_feedback').delete().eq('id', myFeedbackId);
-    if (error) { notify('error', 'Could not delete feedback.'); return; }
+    try {
+      await deleteFeedbackRequest(myFeedbackId);
+    } catch {
+      notify('error', 'Could not delete feedback.');
+      return;
+    }
     setMyRating(0); setMyComment(''); setMyFeedbackId(null);
     notify('success', 'Feedback removed.');
     loadFeedback();
