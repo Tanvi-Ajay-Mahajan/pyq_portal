@@ -7,6 +7,8 @@ export interface DriveFolder {
   pattern: string;
   drive_link: string;
   label: string | null;
+  /** 'folder' opens a Drive folder, 'document' opens a single file (PDF). */
+  kind?: 'folder' | 'document';
   is_default: boolean;
   updated_at?: string;
   /** 'builtin' when the server served its fallback list (no database yet). */
