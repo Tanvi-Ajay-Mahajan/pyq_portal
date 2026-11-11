@@ -43,7 +43,7 @@ export async function updateFeedback(
   id: string,
   payload: { rating?: number; comment?: string | null },
 ): Promise<FeedbackMutationResult> {
-  const { data } = await api.patch<FeedbackMutationResult>(`/feedback/${id}`, payload);
+  const { data } = await api.put<FeedbackMutationResult>(`/feedback/${id}`, payload);
   return data;
 }
 

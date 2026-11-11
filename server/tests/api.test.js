@@ -263,7 +263,7 @@ test('feedback requires auth and updates the average rating', async () => {
   assert.equal(first.json.average, 4);
 
   const updated = await api(`/feedback/${first.json.feedback.id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     token,
     body: { rating: 2 },
   });
