@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
 import type { PyqPaper, YearLevel } from '@/types';
-import { getBranchDriveLink } from '@/lib/branchDriveLinks';
+import { getBranchDriveLink, mergeWithDriveBranches } from '@/lib/branchDriveLinks';
 import PaperFeedback from '@/components/PaperFeedback';
 import {
   ExternalLink, Loader2, FileText, X, ChevronRight, Home as HomeIcon,
@@ -115,7 +115,7 @@ export default function Browse() {
     const branches = allPapers
       .filter((p) => p.year_level === selectedYear && p.branch)
       .map((p) => p.branch as string);
-    return [...new Set(branches)].sort();
+    return mergeWithDriveBranches(branches);
   }, [allPapers, selectedYear]);
 
   const currentStep: Step = !selectedYear ? 'year' : selectedYear === 'FE' || (!selectedBranch && branchesForYear.length > 0) ? 'branch' : 'papers';

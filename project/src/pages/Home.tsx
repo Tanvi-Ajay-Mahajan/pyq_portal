@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useState } from 'react';
 import type { PyqPaper, YearLevel } from '@/types';
-import { getBranchDriveLink } from '@/lib/branchDriveLinks';
+import { getBranchDriveLink, mergeWithDriveBranches } from '@/lib/branchDriveLinks';
 import {
   GraduationCap, Search, FileText, Download, ShieldCheck, BookOpen,
   Layers, ArrowRight, Sparkles, Users, FolderTree, Star, Folder,
@@ -311,7 +311,9 @@ export default function Home() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {(() => {
-              const branches = [...new Set(allPapers.filter((p) => p.branch).map((p) => p.branch as string))].sort();
+              const branches = mergeWithDriveBranches(
+                allPapers.filter((p) => p.branch).map((p) => p.branch as string),
+              );
               return branches.map((branch) => {
                 const count = allPapers.filter((p) => p.branch === branch).length;
                 const driveLink = getBranchDriveLink(branch);

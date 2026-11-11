@@ -18,6 +18,9 @@ export const BRANCH_DRIVE_LINKS = {
 
 export type BranchDriveKey = keyof typeof BRANCH_DRIVE_LINKS;
 
+/** Canonical branch keys that always have a Drive folder. */
+export const BRANCH_DRIVE_KEYS = Object.keys(BRANCH_DRIVE_LINKS) as BranchDriveKey[];
+
 /** Normalize a branch label: uppercase, letters and digits only. */
 function normalize(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -88,4 +91,19 @@ export function openBranchDriveLink(branch: string | null | undefined): boolean 
   if (!link) return false;
   window.open(link, '_blank', 'noopener,noreferrer');
   return true;
+}
+
+/**
+ * Returns the given branch labels plus any canonical branch that is missing.
+ *
+ * The four Drive folders are always offered, even when the database has no
+ * papers stored for a branch yet, so every branch card keeps working.
+ */
+export function mergeWithDriveBranches(branches: string[]): string[] {
+  const result = new Set(branches.filter(Boolean));
+  for (const key of BRANCH_DRIVE_KEYS) {
+    const alreadyListed = [...result].some((branch) => getBranchDriveKey(branch) === key);
+    if (!alreadyListed) result.add(key);
+  }
+  return [...result].sort();
 }
