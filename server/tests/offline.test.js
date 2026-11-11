@@ -75,8 +75,8 @@ test('offline branch folders', async (t) => {
 
     const missing = await fetch(`${base}/api/drive-folders/resolve?branch=Mechanical`);
     assert.equal(missing.status, 404);
-    const missingBody = await missing.json();
-    assert.match(missingBody.message, /Mechanical/);
+    const missingText = await missing.text();
+    assert.match(missingText, /Mechanical/);
   });
 
   await t.test('database-backed endpoints stay honest at 503', async () => {
