@@ -101,6 +101,7 @@ export const toDriveFolder = (folder) => {
     pattern: folder.pattern,
     drive_link: folder.drive_link,
     label: folder.label ?? null,
+    kind: folder.kind ?? 'folder',
     is_default: Boolean(folder.is_default),
     updated_at: folder.updatedAt,
   };

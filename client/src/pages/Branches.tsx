@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   BookOpen,
   ExternalLink,
+  FileText,
   FolderOpen,
   HardHat,
   Loader2,
@@ -63,6 +64,15 @@ const normalizeKey = (value?: string | null) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
+/** Splits 'FE 2024 — Exam circular' into a card title and a note. */
+const splitLabel = (label: string | null | undefined, title: string, note: string) => {
+  const parts = String(label ?? '').split('\u2014');
+  return {
+    title: parts[0]?.trim() || title,
+    note: parts.slice(1).join('\u2014').trim() || note,
+  };
+};
+
 interface BranchEntry {
   key: string;
   name: string;
@@ -107,7 +117,9 @@ export default function Branches() {
     for (const list of index.byBranch.values()) {
       for (const folder of list) {
         const key = normalizeKey(folder.branch);
-        if (!key || entries.has(key)) continue;
+        // Year-level links (branch 'ALL') and standalone documents belong to the
+        // first-year section, never to a branch card.
+        if (!key || key === 'all' || folder.kind === 'document' || entries.has(key)) continue;
 
         const meta = BRANCH_META[key];
         const years = list
@@ -128,6 +140,14 @@ export default function Branches() {
 
     return Array.from(entries.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [index, year]);
+
+  const yearResources = useMemo(() => {
+    const yearFolders = folders.filter(
+      (folder) => folder.kind !== 'document' && normalizeKey(folder.branch) === 'all'
+    );
+    const documents = folders.filter((folder) => folder.kind === 'document');
+    return { yearFolders, documents };
+  }, [folders]);
 
   const usesBuiltinLinks = folders.some((folder) => folder.source === 'builtin');
   const activeYear = YEAR_TABS.find((tab) => tab.value === year);
@@ -186,6 +206,78 @@ export default function Branches() {
             for each branch. Each folder opens directly in Google Drive.
           </p>
         </div>
+
+        {/* First year is shared by every branch, so it gets year-level links. */}
+        {!loading &&
+          !error &&
+          (yearResources.yearFolders.length > 0 || yearResources.documents.length > 0) && (
+            <div className="mb-10">
+              <h2 className="font-display text-xl font-bold text-slate-900">First year (FE)</h2>
+              <p className="mt-1 mb-4 text-sm text-slate-500">
+                First-year material is the same for every branch, so it has its own links instead
+                of a branch card.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {yearResources.yearFolders.map((folder) => {
+                  const card = splitLabel(folder.label, 'FE', 'First year \u2014 all branches');
+                  return (
+                    <a
+                      key={folder.id}
+                      href={folder.drive_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="card p-5 group hover:shadow-lg hover:-translate-y-0.5 transition-all border border-slate-200 hover:border-primary-300"
+                      aria-label={`Open the ${card.title} Google Drive folder in a new tab`}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="grid place-items-center h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-sm">
+                          <FolderOpen className="h-5 w-5" />
+                        </span>
+                        <ExternalLink className="h-4 w-4 text-slate-300 group-hover:text-primary-600 transition-colors" />
+                      </div>
+                      <p className="font-semibold text-slate-900 text-lg leading-tight">
+                        {card.title}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1 min-h-[2rem]">{card.note}</p>
+                      <span className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-primary-700 group-hover:text-primary-800">
+                        <FolderOpen className="h-4 w-4" />
+                        Open Drive folder
+                      </span>
+                    </a>
+                  );
+                })}
+
+                {yearResources.documents.map((doc) => {
+                  const card = splitLabel(doc.label, 'FE 2024', 'Exam circular (PDF)');
+                  return (
+                    <a
+                      key={doc.id}
+                      href={doc.drive_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="card p-5 group hover:shadow-lg hover:-translate-y-0.5 transition-all border border-slate-200 hover:border-primary-300"
+                      aria-label={`Open ${card.title} in a new tab`}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="grid place-items-center h-11 w-11 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-sm">
+                          <FileText className="h-5 w-5" />
+                        </span>
+                        <ExternalLink className="h-4 w-4 text-slate-300 group-hover:text-primary-600 transition-colors" />
+                      </div>
+                      <p className="font-semibold text-slate-900 text-lg leading-tight">
+                        {card.title}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1 min-h-[2rem]">{card.note}</p>
+                      <span className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-primary-700 group-hover:text-primary-800">
+                        <FileText className="h-4 w-4" />
+                        Open PDF
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
         {loading && (
           <div className="flex items-center gap-2 text-slate-500 py-16 justify-center">
@@ -296,8 +388,9 @@ export default function Branches() {
 
         {usesBuiltinLinks && !loading && !error && (
           <p className="mt-8 text-xs text-slate-500">
-            These links come from the portal&apos;s built-in branch list. Connect a MongoDB
-            database and they are served from the database instead, where an admin can edit them.
+            These links come from the portal&apos;s built-in branch and first-year list. Connect a
+            MongoDB database and they are served from the database instead, where an admin can edit
+            them.
           </p>
         )}
       </section>

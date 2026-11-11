@@ -23,26 +23,51 @@ test('offline branch folders', async (t) => {
   const { server, base } = await startServer();
   t.after(() => server.close());
 
-  await t.test('GET /api/drive-folders returns the four branch folders', async () => {
+  await t.test('GET /api/drive-folders returns branch folders plus FE year links', async () => {
     const res = await fetch(`${base}/api/drive-folders`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body), 'expected an array of folders');
-    assert.equal(body.length, DEFAULT_BRANCH_FOLDERS.length);
 
-    const branches = body.map((folder) => folder.branch).sort();
-    assert.deepEqual(branches, ['AIML', 'Civil', 'Computer', 'Electrical']);
+    const branchFolders = body.filter(
+      (folder) => folder.branch !== 'ALL' && folder.kind !== 'document'
+    );
+    assert.equal(branchFolders.length, DEFAULT_BRANCH_FOLDERS.length);
+    assert.deepEqual(branchFolders.map((folder) => folder.branch).sort(), [
+      'AIML',
+      'Civil',
+      'Computer',
+      'Electrical',
+    ]);
 
-    for (const folder of body) {
+    for (const folder of branchFolders) {
       assert.match(folder.drive_link, /^https:\/\/drive\.google\.com\/drive\/folders\/[\w-]+$/);
       assert.ok(folder.id, 'each folder needs an id for the client');
       assert.equal(folder.year_level, 'ALL');
+      assert.equal(folder.kind, 'folder');
     }
 
-    const aiml = body.find((folder) => folder.branch === 'AIML');
+    const aiml = branchFolders.find((folder) => folder.branch === 'AIML');
     assert.equal(
       aiml.drive_link,
       'https://drive.google.com/drive/folders/1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB'
+    );
+
+    // FE is a year-level link, not a branch.
+    const feFolder = body.find((folder) => folder.year_level === 'FE' && folder.kind !== 'document');
+    assert.ok(feFolder, 'expected an FE year-level Drive folder');
+    assert.equal(feFolder.branch, 'ALL');
+    assert.equal(
+      feFolder.drive_link,
+      'https://drive.google.com/drive/folders/1Zt53Ou_TGcnPp-hkKpn6QwUpshogj0Bo'
+    );
+
+    const feDocument = body.find((folder) => folder.kind === 'document');
+    assert.ok(feDocument, 'expected the FE 2024 exam circular');
+    assert.equal(feDocument.year_level, 'FE');
+    assert.equal(
+      feDocument.drive_link,
+      'http://collegecirculars.unipune.ac.in/sites/examdocs/November%20%202024/F.E%20(%202024%20PATTERN%20).pdf'
     );
   });
 

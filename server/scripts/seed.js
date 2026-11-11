@@ -81,7 +81,11 @@ export const SUBJECTS = [
   ['Project Work', 'PRJ402', 8],
 ].map(([name, code, semester]) => ({ name, code, semester }));
 
-import { DEFAULT_BRANCH_FOLDERS } from '../config/defaultDriveFolders.js';
+import {
+  DEFAULT_BRANCH_FOLDERS,
+  DEFAULT_YEAR_FOLDERS,
+  DEFAULT_YEAR_DOCUMENTS,
+} from '../config/defaultDriveFolders.js';
 
 const G = 'https://drive.google.com/drive/folders';
 
@@ -183,8 +187,35 @@ export const BRANCH_WIDE_FOLDERS = DEFAULT_BRANCH_FOLDERS.map((folder) => ({
   pattern: '2024',
   drive_link: folder.drive_link,
   label: folder.label,
+  kind: 'folder',
   is_default: true,
 }));
+
+/**
+ * Year-level links shared by every branch: the FE Drive folder and the FE 2024
+ * exam circular PDF. `branch: 'ALL'` keeps them out of the branch cards and
+ * `kind` separates the folder from the standalone document.
+ */
+export const YEAR_LEVEL_FOLDERS = [
+  ...DEFAULT_YEAR_FOLDERS.map((folder) => ({
+    year_level: folder.year_level,
+    branch: folder.branch,
+    pattern: folder.pattern,
+    drive_link: folder.drive_link,
+    label: folder.label,
+    kind: folder.kind ?? 'folder',
+    is_default: true,
+  })),
+  ...DEFAULT_YEAR_DOCUMENTS.map((folder) => ({
+    year_level: folder.year_level,
+    branch: folder.branch,
+    pattern: folder.pattern,
+    drive_link: folder.drive_link,
+    label: folder.label,
+    kind: folder.kind ?? 'document',
+    is_default: true,
+  })),
+];
 
 /** Year + pattern specific branch folders (derived from the existing SE/TE/BE records). */
 export const YEAR_PATTERN_FOLDERS = PAPERS.filter((paper) => paper.branch && paper.pattern).map(
@@ -311,9 +342,18 @@ export async function seedDatabase({ log = console.log } = {}) {
 
   // Drive folders ------------------------------------------------------------
   let foldersInserted = 0;
-  for (const folder of [...BRANCH_WIDE_FOLDERS, ...YEAR_PATTERN_FOLDERS]) {
+  // A Drive folder and a PDF can share the same year/branch/pattern, so the
+  // unique key includes `kind`. Drop the older three-field index if present.
+  await DriveFolder.collection.dropIndex('year_level_1_branch_1_pattern_1').catch(() => {});
+
+  for (const folder of [...BRANCH_WIDE_FOLDERS, ...YEAR_PATTERN_FOLDERS, ...YEAR_LEVEL_FOLDERS]) {
     const result = await DriveFolder.updateOne(
-      { year_level: folder.year_level, branch: folder.branch, pattern: folder.pattern },
+      {
+        year_level: folder.year_level,
+        branch: folder.branch,
+        pattern: folder.pattern,
+        kind: folder.kind ?? 'folder',
+      },
       { $set: folder },
       { upsert: true }
     );

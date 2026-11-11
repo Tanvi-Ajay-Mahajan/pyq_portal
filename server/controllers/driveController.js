@@ -1,7 +1,11 @@
 import DriveFolder from '../models/DriveFolder.js';
 import Paper from '../models/Paper.js';
 import { isDbConnected } from '../config/db.js';
-import { DEFAULT_BRANCH_FOLDERS } from '../config/defaultDriveFolders.js';
+import {
+  DEFAULT_BRANCH_FOLDERS,
+  DEFAULT_YEAR_FOLDERS,
+  DEFAULT_YEAR_DOCUMENTS,
+} from '../config/defaultDriveFolders.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { toDriveFolder } from '../utils/serialize.js';
@@ -29,14 +33,28 @@ const byNewestPattern = (a, b) => patternRank(b.pattern) - patternRank(a.pattern
  * file browser works before MONGODB_URI is configured. `_id` is present so the
  * shared serializer produces a stable `id` for the client.
  */
-const builtinFolders = () =>
-  DEFAULT_BRANCH_FOLDERS.map(({ slug, ...folder }) => ({
+const builtinFolders = () => [
+  ...DEFAULT_BRANCH_FOLDERS.map(({ slug, ...folder }) => ({
     _id: `builtin-${slug}`,
     year_level: DRIVE_FOLDER_ALL_YEARS,
     pattern: '2024',
+    kind: 'folder',
     is_default: true,
     ...folder,
-  }));
+  })),
+  ...DEFAULT_YEAR_FOLDERS.map(({ slug, ...folder }) => ({
+    _id: `builtin-${slug}`,
+    is_default: true,
+    kind: 'folder',
+    ...folder,
+  })),
+  ...DEFAULT_YEAR_DOCUMENTS.map(({ slug, ...folder }) => ({
+    _id: `builtin-${slug}`,
+    is_default: true,
+    kind: 'document',
+    ...folder,
+  })),
+];
 
 /**
  * Picks the best Drive folder for a year + branch + optional pattern:
