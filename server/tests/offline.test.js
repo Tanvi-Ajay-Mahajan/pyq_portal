@@ -1,0 +1,105 @@
+/**
+ * Verifies the branch Drive browser works with NO database configured, which is
+ * the deployed state until MONGODB_URI is set. The four branch folders must be
+ * served read-only from server/config/defaultDriveFolders.js, while writes and
+ * paper queries keep returning a clear 503 instead of hanging or faking data.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp } from '../app.js';
+import { isDbConnected } from '../config/db.js';
+import { DEFAULT_BRANCH_FOLDERS } from '../config/defaultDriveFolders.js';
+
+const startServer = async () => {
+  const app = createApp();
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+  return { server, base: `http://127.0.0.1:${port}` };
+};
+
+test('offline branch folders', async (t) => {
+  assert.equal(isDbConnected(), false, 'this suite must run without a database');
+  const { server, base } = await startServer();
+  t.after(() => server.close());
+
+  await t.test('GET /api/drive-folders returns the four branch folders', async () => {
+    const res = await fetch(`${base}/api/drive-folders`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body), 'expected an array of folders');
+    assert.equal(body.length, DEFAULT_BRANCH_FOLDERS.length);
+
+    const branches = body.map((folder) => folder.branch).sort();
+    assert.deepEqual(branches, ['AIML', 'Civil', 'Computer', 'Electrical']);
+
+    for (const folder of body) {
+      assert.match(folder.drive_link, /^https:\/\/drive\.google\.com\/drive\/folders\/[\w-]+$/);
+      assert.ok(folder.id, 'each folder needs an id for the client');
+      assert.equal(folder.year_level, 'ALL');
+    }
+
+    const aiml = body.find((folder) => folder.branch === 'AIML');
+    assert.equal(
+      aiml.drive_link,
+      'https://drive.google.com/drive/folders/1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB'
+    );
+  });
+
+  await t.test('GET /api/drive-folders/resolve resolves per branch and year', async () => {
+    const cases = [
+      ['AIML', '1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB'],
+      ['Civil', '1U8N82pIk_Aihd9zO0ibplfKknZisTOeA'],
+      ['Computer', '1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH'],
+      ['Electrical', '1SIgkt4Dhovn0cakRY6vCFYHVkGGqsbjn'],
+    ];
+
+    for (const [branch, folderId] of cases) {
+      const res = await fetch(
+        `${base}/api/drive-folders/resolve?branch=${encodeURIComponent(branch)}&year_level=SE`
+      );
+      assert.equal(res.status, 200, `${branch} should resolve`);
+      const body = await res.json();
+      assert.ok(
+        body.drive_link.endsWith(folderId),
+        `${branch} resolved to ${body.drive_link}`
+      );
+    }
+  });
+
+  await t.test('branch aliases and unknown branches behave predictably', async () => {
+    const alias = await fetch(`${base}/api/drive-folders/resolve?branch=CE`);
+    assert.equal(alias.status, 200, 'CE is an alias of the Computer branch');
+    const aliasBody = await alias.json();
+    assert.ok(aliasBody.drive_link.endsWith('1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH'));
+
+    const missing = await fetch(`${base}/api/drive-folders/resolve?branch=Mechanical`);
+    assert.equal(missing.status, 404);
+    const missingBody = await missing.json();
+    assert.match(missingBody.message, /Mechanical/);
+  });
+
+  await t.test('database-backed endpoints stay honest at 503', async () => {
+    const papers = await fetch(`${base}/api/papers`);
+    assert.equal(papers.status, 503);
+
+    const login = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'student@example.com', password: 'secret123' }),
+    });
+    assert.equal(login.status, 503);
+  });
+
+  await t.test('admin Drive writes are rejected without a database', async () => {
+    const res = await fetch(`${base}/api/drive-folders`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        branch: 'AIML',
+        drive_link: 'https://drive.google.com/drive/folders/abc123',
+      }),
+    });
+    assert.equal(res.status, 503);
+  });
+});
