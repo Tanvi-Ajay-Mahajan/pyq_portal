@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabaseClient';
+import { fetchPapers } from '@/services/paperService';
+import { fetchDriveFolders } from '@/services/driveService';
 import { useAuth } from '@/context/AuthContext';
 import type { PyqPaper, YearLevel } from '@/types';
-import { getBranchDriveLink, mergeWithDriveBranches } from '@/lib/branchDriveLinks';
+import { buildDriveIndex, getBranchDriveLink, mergeWithDriveBranches, type DriveIndex } from '@/lib/branchDriveLinks';
 import PaperFeedback from '@/components/PaperFeedback';
 import {
   ExternalLink, Loader2, FileText, X, ChevronRight, Home as HomeIcon,
@@ -29,6 +30,7 @@ export default function Browse() {
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
   const [selectedPaper, setSelectedPaper] = useState<PyqPaper | null>(null);
   const [ratingCounts, setRatingCounts] = useState<Record<string, { avg: number; count: number }>>({});
+  const [driveIndex, setDriveIndex] = useState<DriveIndex>({ byBranch: new Map() });
 
   // Initialize from URL params
   useEffect(() => {
@@ -42,11 +44,21 @@ export default function Browse() {
 
   const loadPapers = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('pyq_papers').select('*').order('created_at', { ascending: true });
-    if (error) {
+    try {
+      const rows = (await fetchPapers()) as (PyqPaper & {
+        rating_average?: number;
+        rating_count?: number;
+      })[];
+      setAllPapers(rows);
+      const map: Record<string, { avg: number; count: number }> = {};
+      for (const paper of rows) {
+        if (!paper.rating_count) continue;
+        map[paper.id] = { avg: paper.rating_average ?? 0, count: paper.rating_count };
+      }
+      setRatingCounts(map);
+    } catch {
       setAllPapers([]);
-    } else {
-      setAllPapers((data ?? []) as PyqPaper[]);
+      setRatingCounts({});
     }
     setLoading(false);
   }, []);
@@ -55,25 +67,20 @@ export default function Browse() {
     loadPapers();
   }, [loadPapers]);
 
-  // Load rating summaries
+  // Drive folders come from MongoDB (year + branch + pattern); newest pattern wins.
   useEffect(() => {
-    if (allPapers.length === 0) return;
-    supabase
-      .from('pyq_feedback')
-      .select('paper_id, rating')
-      .in('paper_id', allPapers.map((p) => p.id))
-      .then(({ data: rows }) => {
-        if (!rows) return;
-        const map: Record<string, { avg: number; count: number }> = {};
-        for (const r of rows as { paper_id: string; rating: number }[]) {
-          if (!map[r.paper_id]) map[r.paper_id] = { avg: 0, count: 0 };
-          map[r.paper_id].avg += r.rating;
-          map[r.paper_id].count += 1;
-        }
-        for (const k of Object.keys(map)) map[k].avg = map[k].avg / map[k].count;
-        setRatingCounts(map);
+    let cancelled = false;
+    fetchDriveFolders()
+      .then((folders) => {
+        if (!cancelled) setDriveIndex(buildDriveIndex(folders));
+      })
+      .catch(() => {
+        if (!cancelled) setDriveIndex({ byBranch: new Map() });
       });
-  }, [allPapers]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateUrl = (year: YearLevel | null, branch: string | null) => {
     const params: Record<string, string> = {};
@@ -115,8 +122,8 @@ export default function Browse() {
     const branches = allPapers
       .filter((p) => p.year_level === selectedYear && p.branch)
       .map((p) => p.branch as string);
-    return mergeWithDriveBranches(branches);
-  }, [allPapers, selectedYear]);
+    return mergeWithDriveBranches(branches, driveIndex);
+  }, [allPapers, selectedYear, driveIndex]);
 
   const currentStep: Step = !selectedYear ? 'year' : selectedYear === 'FE' || (!selectedBranch && branchesForYear.length > 0) ? 'branch' : 'papers';
 
@@ -129,7 +136,7 @@ export default function Browse() {
   }, [allPapers, selectedYear, selectedBranch]);
 
   const yearMeta = YEAR_LEVELS.find((y) => y.key === selectedYear);
-  const branchDriveLink = getBranchDriveLink(selectedBranch);
+  const branchDriveLink = getBranchDriveLink(driveIndex, selectedBranch, selectedYear);
 
   if (loading) {
     return (
