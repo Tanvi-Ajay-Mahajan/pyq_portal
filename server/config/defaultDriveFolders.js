@@ -26,7 +26,7 @@ export const DEFAULT_BRANCH_FOLDERS = [
     branch: 'AIML',
     slug: 'aiml',
     label: 'AIML — All years',
-    drive_link: `${DRIVE_FOLDER_BASE}/1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB`,
+    drive_link: `${DRIVE_FOLDER_BASE}/16qpRY6eoaNqt79VpPCJV82Mtq3cO-ago`,
   },
   {
     branch: 'Civil',
@@ -45,6 +45,36 @@ export const DEFAULT_BRANCH_FOLDERS = [
     slug: 'electrical',
     label: 'Electrical — All years',
     drive_link: `${DRIVE_FOLDER_BASE}/1SIgkt4Dhovn0cakRY6vCFYHVkGGqsbjn`,
+  },
+  {
+    branch: 'ENTC',
+    slug: 'entc',
+    label: 'ENTC (Electronics & Telecommunication) — All years',
+    drive_link: `${DRIVE_FOLDER_BASE}/11anFaTKjfcrS3NpMJCE7-DcX6UUaMlY_`,
+  },
+  {
+    branch: 'E & CE',
+    slug: 'ece',
+    label: 'E & CE (Electronics & Computer) — All years',
+    drive_link: `${DRIVE_FOLDER_BASE}/1RNvEYcduwXcbK3np2tL0k0lFK1bYIkYE`,
+  },
+  {
+    branch: 'IT',
+    slug: 'it',
+    label: 'IT Engineering — All years',
+    drive_link: `${DRIVE_FOLDER_BASE}/1_r4aaWaDHKVrg2RBJ_udiCSh59JRhCG-`,
+  },
+  {
+    branch: 'Mechanical',
+    slug: 'mechanical',
+    label: 'Mechanical Engineering — All years',
+    drive_link: `${DRIVE_FOLDER_BASE}/1d_y0hi2frgdVLzNJodqnLv1rsVB4R1LT`,
+  },
+  {
+    branch: 'Robotics & Automation',
+    slug: 'robotics',
+    label: 'Robotics & Automation Engineering — All years',
+    drive_link: `${DRIVE_FOLDER_BASE}/1bWylIfNbB_OqIB-EA02Lcyj-ZpmE-RG71`,
   },
 ];
 

@@ -43,6 +43,7 @@ export function normalizeYearLevel(yearLevel) {
  * Drive folder lookups stay reliable.
  */
 const BRANCH_ALIASES = [
+  [/electronics\s*(?:&|and)\s*computer|e\s*&\s*ce|^ece$|ecse/i, 'ece'],
   [/computer|cmpn|cmpe|^ce$|cse/i, 'computer'],
   [/information technology|^it$|inft/i, 'it'],
   [/artificial intelligence.*data science|aids|aiml|ai\s*&\s*ml|machine learning/i, 'aiml'],
@@ -50,6 +51,7 @@ const BRANCH_ALIASES = [
   [/electrical(?!\s*&?\s*tele)|^elec$|^ee$/i, 'electrical'],
   [/electronics.*tele|e\s*&\s*tc|entc|etc|electronics/i, 'etc'],
   [/mechanical|mech/i, 'mechanical'],
+  [/robotics|automation/i, 'robotics'],
   [/instrumentation|instru/i, 'instrumentation'],
   [/automobile|auto/i, 'automobile'],
 ];
