@@ -29,34 +29,40 @@ function pickFolder(candidates, { yearLevel, branchKey, branchName, pattern }) {
   const aliasMatches = candidates.filter((doc) => normalizeBranchKey(doc.branch) === branchKey);
   if (aliasMatches.length === 0) return null;
 
-  // Prefer the exact branch spelling that was requested so a near-duplicate
-  // alias entry ('Computer' vs 'COMPUTER') cannot shadow the correct link.
   const wanted = String(branchName || '').trim().toLowerCase();
-  const exactBranch = wanted
-    ? aliasMatches.filter((doc) => String(doc.branch).trim().toLowerCase() === wanted)
-    : [];
-  const forBranch = exactBranch.length > 0 ? exactBranch : aliasMatches;
+  const wantsPattern = (doc) =>
+    String(doc.pattern).toLowerCase() === String(pattern).toLowerCase();
 
+  /** Newest pattern wins; the requested branch spelling breaks ties. */
+  const best = (docs) => {
+    if (!docs.length) return null;
+    const exact = wanted
+      ? docs.filter((doc) => String(doc.branch).trim().toLowerCase() === wanted)
+      : [];
+    const [newest] = [...(exact.length > 0 ? exact : docs)].sort(byNewestPattern);
+    return newest;
+  };
+
+  const yearDocs = aliasMatches.filter((doc) => doc.year_level === yearLevel);
+  const wideDocs = aliasMatches.filter((doc) => doc.year_level === DRIVE_FOLDER_ALL_YEARS);
+
+  // A year-specific row always beats the branch-wide fallback, even when the
+  // branch is stored under an alias spelling (the Computer branch is seeded as
+  // 'CE'), because it is the more precise match for the click.
   if (pattern) {
-    const exactPattern = forBranch.find(
-      (doc) => String(doc.pattern).toLowerCase() === String(pattern).toLowerCase()
-    );
-    if (exactPattern) return { doc: exactPattern, match: 'exact' };
+    const exactYear = best(yearDocs.filter(wantsPattern));
+    if (exactYear) return { doc: exactYear, match: 'exact' };
+    const exactWide = best(wideDocs.filter(wantsPattern));
+    if (exactWide) return { doc: exactWide, match: 'exact-branch-wide' };
   }
 
-  const forYear = forBranch.filter((doc) => doc.year_level === yearLevel);
-  if (forYear.length > 0) {
-    const [newest] = [...forYear].sort(byNewestPattern);
-    return { doc: newest, match: pattern ? 'latest-pattern' : 'year' };
-  }
+  const forYear = best(yearDocs);
+  if (forYear) return { doc: forYear, match: pattern ? 'latest-pattern' : 'year' };
 
-  const branchWide = forBranch.filter((doc) => doc.year_level === DRIVE_FOLDER_ALL_YEARS);
-  if (branchWide.length > 0) {
-    const [newest] = [...branchWide].sort(byNewestPattern);
-    return { doc: newest, match: 'branch-wide' };
-  }
+  const branchWide = best(wideDocs);
+  if (branchWide) return { doc: branchWide, match: 'branch-wide' };
 
-  const [fallback] = [...forBranch].sort(byNewestPattern);
+  const fallback = best(aliasMatches);
   return fallback ? { doc: fallback, match: 'fallback' } : null;
 }
 
