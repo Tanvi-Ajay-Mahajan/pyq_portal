@@ -42,6 +42,14 @@ async function isFile(path) {
 const server = createServer(async (req, res) => {
   try {
     const requestPath = decodeURIComponent((req.url || '/').split('?')[0]);
+
+    // Cheap liveness probe for the hosting health check.
+    if (requestPath === '/healthz') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('ok');
+      return;
+    }
+
     const relative = normalize(requestPath)
       .replace(/^(\.\.[/\\])+/, '')
       .replace(/^[/\\]+/, '');
