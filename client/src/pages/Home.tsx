@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { fetchPapers, fetchStats } from '@/services/paperService';
+import { fetchDriveFolders } from '@/services/driveService';
 import { useEffect, useState } from 'react';
 import type { PyqPaper, YearLevel } from '@/types';
-import { getBranchDriveLink, mergeWithDriveBranches } from '@/lib/branchDriveLinks';
+import { buildDriveIndex, getBranchDriveLink, mergeWithDriveBranches, type DriveIndex } from '@/lib/branchDriveLinks';
 import {
   GraduationCap, Search, FileText, Download, ShieldCheck, BookOpen,
   Layers, ArrowRight, Sparkles, Users, FolderTree, Star, Folder,
@@ -16,6 +17,7 @@ export default function Home() {
   const [subjectCount, setSubjectCount] = useState<number | null>(null);
   const [topPapers, setTopPapers] = useState<{ paper: PyqPaper; avg: number; count: number }[]>([]);
   const [allPapers, setAllPapers] = useState<PyqPaper[]>([]);
+  const [driveIndex, setDriveIndex] = useState<DriveIndex>({ byBranch: new Map() });
 
   useEffect(() => {
     supabase.from('pyq_papers').select('*', { count: 'exact', head: true }).then(
