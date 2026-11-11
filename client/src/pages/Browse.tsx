@@ -203,6 +203,7 @@ export default function Browse() {
                 branch={branch}
                 count={count}
                 yearMeta={yearMeta}
+                driveIndex={driveIndex}
                 onSelect={() => selectBranch(branch)}
               />
             );
@@ -378,14 +379,16 @@ function BranchCard({
   branch,
   count,
   yearMeta,
+  driveIndex,
   onSelect,
 }: {
   branch: string;
   count: number;
   yearMeta?: { bg: string; text: string };
+  driveIndex: DriveIndex;
   onSelect: () => void;
 }) {
-  const driveLink = getBranchDriveLink(branch);
+  const driveLink = getBranchDriveLink(driveIndex, branch);
 
   const inner = (
     <>
