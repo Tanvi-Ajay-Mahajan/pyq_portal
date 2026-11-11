@@ -68,12 +68,13 @@ export default function Dashboard() {
     };
   }, [profile]);
 
+  // Hide counters that would render as "0" while no database is connected.
   const stats = [
-    { label: 'Total Papers', value: paperCount ?? '—', icon: FileText, color: 'bg-primary-50 text-primary-600' },
-    { label: 'Branches', value: branchCount ?? '—', icon: Layers, color: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Papers', value: paperCount ?? 0, icon: FileText, color: 'bg-primary-50 text-primary-600' },
+    { label: 'Branches', value: branchCount ?? 0, icon: Layers, color: 'bg-blue-50 text-blue-600' },
     { label: 'Year Levels', value: 4, icon: BookOpen, color: 'bg-emerald-50 text-emerald-600' },
     { label: 'Patterns', value: 3, icon: TrendingUp, color: 'bg-accent-50 text-accent-600' },
-  ];
+  ].filter((stat) => stat.value > 0);
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
@@ -123,7 +124,7 @@ export default function Dashboard() {
             </Link>
           </div>
           {recentPapers.length === 0 ? (
-            <p className="text-sm text-slate-400 py-8 text-center">No papers available yet.</p>
+            <p className="text-sm text-slate-400 py-8 text-center">Recently added papers will appear here.</p>
           ) : (
             <div className="space-y-2">
               {recentPapers.map((p) => (

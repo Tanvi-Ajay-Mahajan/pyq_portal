@@ -96,12 +96,13 @@ export default function Home() {
     return document?.drive_link ?? null;
   }, [driveFolders]);
 
+  // Only show counters that have a real value, so the site never advertises "0 papers".
   const stats = [
-    { label: 'Question Papers', value: paperCount ?? '—', icon: FileText },
-    { label: 'Branches', value: branchCount ?? '—', icon: Layers },
-    { label: 'FE Subjects', value: subjectCount ?? '—', icon: BookOpen },
+    { label: 'Question Papers', value: paperCount ?? 0, icon: FileText },
+    { label: 'Branches', value: branchCount ?? 0, icon: Layers },
+    { label: 'FE Subjects', value: subjectCount ?? 0, icon: BookOpen },
     { label: 'Year Levels', value: 4, icon: FolderTree },
-  ];
+  ].filter((stat) => stat.value > 0);
 
   const features = [
     { icon: Search, title: 'Smart Search', desc: 'Find papers by subject name, code, branch, or semester in seconds.' },
