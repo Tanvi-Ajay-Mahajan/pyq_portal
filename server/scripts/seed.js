@@ -81,6 +81,8 @@ export const SUBJECTS = [
   ['Project Work', 'PRJ402', 8],
 ].map(([name, code, semester]) => ({ name, code, semester }));
 
+import { DEFAULT_BRANCH_FOLDERS } from '../config/defaultDriveFolders.js';
+
 const G = 'https://drive.google.com/drive/folders';
 
 /** Every existing PYQ record, with its original Drive link. */
