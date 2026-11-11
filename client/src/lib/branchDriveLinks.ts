@@ -1,109 +1,119 @@
+import { resolveDriveFolder, type DriveFolder } from '@/services/driveService';
+
 /**
- * Google Drive folder links per branch.
- *
- * Clicking a branch anywhere in the app opens the matching Drive folder
- * directly, so students land in the shared archive instead of an empty
- * in-app paper list.
- *
- * To point a branch at a different folder (or add a new one), edit the
- * BRANCH_DRIVE_LINKS map and, if the branch has a different name in the
- * database, add the name to BRANCH_ALIASES.
+ * Google Drive links now come from MongoDB through the REST API — nothing is
+ * hardcoded in the frontend. These helpers index the folders once, pick the
+ * newest pattern by default, and open the tab immediately on user interaction
+ * so the browser never blocks the popup while the API call is in flight.
  */
-export const BRANCH_DRIVE_LINKS = {
-  AIML: 'https://drive.google.com/drive/folders/1eIQPlauDt4SvjS7c1c3F24SuPUXLdMPB',
-  CIVIL: 'https://drive.google.com/drive/folders/1U8N82pIk_Aihd9zO0ibplfKknZisTOeA',
-  COMPUTER: 'https://drive.google.com/drive/folders/1wEtVRbe72SfOr479dSFlhkjMOR1h2FfH',
-  ELECTRICAL: 'https://drive.google.com/drive/folders/1SIgkt4Dhovn0cakRY6vCFYHVkGGqsbjn',
-} as const;
 
-export type BranchDriveKey = keyof typeof BRANCH_DRIVE_LINKS;
-
-/** Canonical branch keys that always have a Drive folder. */
-export const BRANCH_DRIVE_KEYS = Object.keys(BRANCH_DRIVE_LINKS) as BranchDriveKey[];
-
-/** Normalize a branch label: uppercase, letters and digits only. */
-function normalize(value: string): string {
-  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+export interface DriveIndex {
+  byBranch: Map<string, DriveFolder[]>;
 }
 
-/**
- * Every spelling/abbreviation of a branch that should open a Drive folder.
- * Keys are normalized branch labels, values are the Drive link keys.
- */
-const BRANCH_ALIASES: Record<string, BranchDriveKey> = {
-  // AI & Machine Learning / AI & Data Science
-  AIML: 'AIML',
-  AI: 'AIML',
-  AIDS: 'AIML',
-  AIDSAIML: 'AIML',
-  AIMLDS: 'AIML',
-  ARTIFICIALINTELLIGENCE: 'AIML',
-  ARTIFICIALINTELLIGENCEANDMACHINELEARNING: 'AIML',
-  ARTIFICIALINTELLIGENCEANDDATASCIENCE: 'AIML',
+const normalize = (value?: string | null) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 
-  // Civil
-  CIVIL: 'CIVIL',
-  CIVILENGINEERING: 'CIVIL',
-  CL: 'CIVIL',
-
-  // Computer
-  CE: 'COMPUTER',
-  CO: 'COMPUTER',
-  COMP: 'COMPUTER',
-  COMPUTER: 'COMPUTER',
-  COMPUTERENGINEERING: 'COMPUTER',
-  COMPUTERSCIENCE: 'COMPUTER',
-  CSE: 'COMPUTER',
-
-  // Electrical
-  EE: 'ELECTRICAL',
-  EEE: 'ELECTRICAL',
-  ELEC: 'ELECTRICAL',
-  ELECT: 'ELECTRICAL',
-  ELECTRICAL: 'ELECTRICAL',
-  ELECTRICALENGINEERING: 'ELECTRICAL',
+/** Pattern labels are compared as numbers when possible so 2024 > 2019 > 2015. */
+const patternWeight = (pattern?: string | null) => {
+  const digits = String(pattern ?? '').replace(/\D/g, '');
+  const parsed = Number(digits.slice(0, 4));
+  return Number.isFinite(parsed) && parsed > 1900 ? parsed : 0;
 };
 
-/** Returns the Drive link key for a branch label, or null when unmapped. */
-export function getBranchDriveKey(branch: string | null | undefined): BranchDriveKey | null {
-  if (!branch) return null;
-  return BRANCH_ALIASES[normalize(branch)] ?? null;
-}
-
-/**
- * Returns the Google Drive folder URL for a branch label, or null when the
- * branch has no Drive folder configured (the app then falls back to the
- * in-app paper list).
- */
-export function getBranchDriveLink(branch: string | null | undefined): string | null {
-  const key = getBranchDriveKey(branch);
-  return key ? BRANCH_DRIVE_LINKS[key] : null;
-}
-
-/** True when the branch opens a Drive folder on click. */
-export function hasBranchDriveLink(branch: string | null | undefined): boolean {
-  return getBranchDriveLink(branch) !== null;
-}
-
-/** Opens the branch Drive folder in a new tab. Returns false when unmapped. */
-export function openBranchDriveLink(branch: string | null | undefined): boolean {
-  const link = getBranchDriveLink(branch);
-  if (!link) return false;
-  window.open(link, '_blank', 'noopener,noreferrer');
-  return true;
-}
-
-/**
- * Returns the given branch labels plus any canonical branch that is missing.
- *
- * The four Drive folders are always offered, even when the database has no
- * papers stored for a branch yet, so every branch card keeps working.
- */
-export function mergeWithDriveBranches(branches: string[]): string[] {
-  const result = new Set(branches.filter(Boolean));
-  for (const key of BRANCH_DRIVE_KEYS) {
-    const alreadyListed = [...result].some((branch) => getBranchDriveKey(branch) === key);
-    if (!alreadyListed) result.add(key);
+export function buildDriveIndex(folders: DriveFolder[]): DriveIndex {
+  const byBranch = new Map<string, DriveFolder[]>();
+  for (const folder of folders) {
+    const key = normalize(folder.branch);
+    if (!key) continue;
+    const list = byBranch.get(key) ?? [];
+    list.push(folder);
+    byBranch.set(key, list);
   }
-  return [...result].sort();
+  return { byBranch };
+}
+
+/**
+ * Resolves a branch link locally (no request) for rendering, preferring an
+ * exact year match, then a branch-wide entry, then the newest pattern.
+ */
+export function getBranchDriveLink(
+  index: DriveIndex,
+  branch?: string | null,
+  yearLevel?: string | null,
+): string | null {
+  const folders = index.byBranch.get(normalize(branch));
+  if (!folders || folders.length === 0) return null;
+
+  const yearKey = normalize(yearLevel);
+  const matchesYear = (folder: DriveFolder) =>
+    normalize(folder.year_level) === yearKey && yearKey !== '';
+
+  const ordered = [...folders].sort((a, b) => patternWeight(b.pattern) - patternWeight(a.pattern));
+  const exact = ordered.find(matchesYear);
+  return (exact ?? ordered[0]).drive_link;
+}
+
+/** Every branch that has a Drive folder, merged with branch names from papers. */
+export function mergeWithDriveBranches(branches: string[], index: DriveIndex): string[] {
+  const merged = new Set<string>();
+  for (const branch of branches) {
+    if (branch) merged.add(branch);
+  }
+  for (const list of index.byBranch.values()) {
+    for (const folder of list) {
+      if (folder.branch) merged.add(folder.branch);
+    }
+  }
+  return Array.from(merged).sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Opens the Drive folder for a year + branch in a new tab.
+ *
+ * The tab is opened synchronously (inside the click handler) so popup blockers
+ * allow it; it is then pointed at the URL the API returns. If the API reports
+ * that no folder is configured, the tab is closed and the error is surfaced.
+ */
+export async function openBranchDriveLink(params: {
+  branch: string;
+  yearLevel?: string | null;
+  pattern?: string | null;
+}): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const pendingTab = window.open('', '_blank');
+
+  if (pendingTab) {
+    pendingTab.document.write(
+      '<title>Opening Google Drive…</title><body style="font-family:system-ui;padding:2rem;color:#334155">Opening Google Drive…</body>',
+    );
+  }
+
+  try {
+    const resolved = await resolveDriveFolder({
+      branch: params.branch,
+      year_level: params.yearLevel ?? undefined,
+      pattern: params.pattern ?? undefined,
+    });
+
+    if (!resolved?.drive_link) {
+      throw new Error('No Google Drive folder is configured for this branch yet.');
+    }
+
+    if (pendingTab) {
+      pendingTab.location.replace(resolved.drive_link);
+    } else {
+      window.open(resolved.drive_link, '_blank', 'noopener,noreferrer');
+    }
+    return { ok: true, url: resolved.drive_link };
+  } catch (error) {
+    pendingTab?.close();
+    const message =
+      (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+      (error as Error)?.message ||
+      'Could not open the Google Drive folder.';
+    return { ok: false, error: message };
+  }
 }

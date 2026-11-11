@@ -1,42 +1,58 @@
-import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import type { ReferenceData } from '@/types';
+import { useEffect, useState } from 'react';
+import type { AcademicYear, Branch, Scheme, Semester, Subject } from '@/types';
+import { fetchReferenceData } from '@/services/referenceService';
 
+interface ReferenceState {
+  branches: Branch[];
+  schemes: Scheme[];
+  academicYears: AcademicYear[];
+  semesters: Semester[];
+  subjects: Subject[];
+  loading: boolean;
+  error: string | null;
+}
+
+const EMPTY: ReferenceState = {
+  branches: [],
+  schemes: [],
+  academicYears: [],
+  semesters: [],
+  subjects: [],
+  loading: true,
+  error: null,
+};
+
+/** Loads branches/schemes/years/semesters/subjects from the Express API. */
 export function useReferenceData() {
-  const [data, setData] = useState<ReferenceData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [branches, schemes, academicYears, semesters] = await Promise.all([
-        supabase.from('branches').select('id, code, name').order('name'),
-        supabase.from('schemes').select('id, name').order('name'),
-        supabase.from('academic_years').select('id, year').order('year', { ascending: false }),
-        supabase.from('semesters').select('id, number, label').order('number'),
-      ]);
-
-      const errors = [branches.error, schemes.error, academicYears.error, semesters.error].filter(Boolean);
-      if (errors.length) throw errors[0];
-
-      setData({
-        branches: branches.data as never,
-        schemes: schemes.data as never,
-        academicYears: academicYears.data as never,
-        semesters: semesters.data as never,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load reference data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [state, setState] = useState<ReferenceState>(EMPTY);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
 
-  return { data, loading, error, reload: load };
+    fetchReferenceData()
+      .then((data) => {
+        if (!active) return;
+        setState({
+          branches: data.branches ?? [],
+          schemes: data.schemes ?? [],
+          academicYears: data.academicYears ?? [],
+          semesters: data.semesters ?? [],
+          subjects: data.subjects ?? [],
+          loading: false,
+          error: null,
+        });
+      })
+      .catch((error: Error) => {
+        if (!active) return;
+        setState({ ...EMPTY, loading: false, error: error.message });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return state;
 }
+
+export default useReferenceData;
