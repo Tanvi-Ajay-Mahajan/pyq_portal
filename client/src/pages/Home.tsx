@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { fetchPapers, fetchStats } from '@/services/paperService';
-import { fetchDriveFolders } from '@/services/driveService';
-import { useEffect, useState } from 'react';
-import type { PyqPaper, YearLevel } from '@/types';
+import { fetchDriveFolders, type DriveFolder } from '@/services/driveService';
+import { useEffect, useMemo, useState } from 'react';
+import type { PyqPaper } from '@/types';
 import { buildDriveIndex, getBranchDriveLink, mergeWithDriveBranches, type DriveIndex } from '@/lib/branchDriveLinks';
 import {
   GraduationCap, Search, FileText, Download, ShieldCheck, BookOpen,
@@ -18,6 +18,7 @@ export default function Home() {
   const [topPapers, setTopPapers] = useState<{ paper: PyqPaper; avg: number; count: number }[]>([]);
   const [allPapers, setAllPapers] = useState<PyqPaper[]>([]);
   const [driveIndex, setDriveIndex] = useState<DriveIndex>({ byBranch: new Map() });
+  const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,10 +57,15 @@ export default function Home() {
 
     fetchDriveFolders()
       .then((folders) => {
-        if (!cancelled) setDriveIndex(buildDriveIndex(folders));
+        if (cancelled) return;
+        setDriveFolders(Array.isArray(folders) ? folders : []);
+        setDriveIndex(buildDriveIndex(folders));
       })
       .catch(() => {
-        if (!cancelled) setDriveIndex({ byBranch: new Map() });
+        if (!cancelled) {
+          setDriveFolders([]);
+          setDriveIndex({ byBranch: new Map() });
+        }
       });
 
     return () => {
@@ -73,6 +79,22 @@ export default function Home() {
     const branches = new Set(allPapers.filter((p) => p.branch).map((p) => p.branch as string));
     setBranchCount(branches.size);
   }, [allPapers]);
+
+  // FE and FE 2024 links come from the API (MongoDB, or the server's built-in
+  // list while no database is connected) — never hardcoded in the component.
+  const feFolderLink = useMemo(() => {
+    const folder = driveFolders.find(
+      (item) => item.year_level === 'FE' && item.kind !== 'document'
+    );
+    return folder?.drive_link ?? null;
+  }, [driveFolders]);
+
+  const feDocumentLink = useMemo(() => {
+    const document = driveFolders.find(
+      (item) => item.year_level === 'FE' && item.kind === 'document'
+    );
+    return document?.drive_link ?? null;
+  }, [driveFolders]);
 
   const stats = [
     { label: 'Question Papers', value: paperCount ?? '—', icon: FileText },
@@ -218,68 +240,82 @@ export default function Home() {
       Browse by Year
     </h2>
     <p className="text-slate-500 text-lg">
-      Pick your year, then choose your branch. FE papers are listed directly by subject.
+      Pick your year, then choose your branch. FE opens the first-year Drive folder,
+      FE 2024 opens the official SPPU circular.
     </p>
   </div>
 
-  {/* Center FE Card */}
-  <div className="grid grid-cols-1 place-items-center">
+  {/* FE and FE 2024 sit at the same level; each opens its document directly */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 place-items-center max-w-2xl mx-auto">
 
     {([
       {
-        key: 'FE' as YearLevel,
+        key: 'FE',
+        box: 'FE',
         full: 'First Year',
-        desc: 'By subject — no branch needed',
+        desc: 'Opens the FE Google Drive folder',
+        link: feFolderLink,
+        cta: 'Open Drive folder',
+        note: 'Google Drive',
         color: 'from-sky-500 to-sky-700',
         bg: 'bg-sky-50',
-        text: 'text-sky-700'
-      }
-    ]).map((yr) => {
+        text: 'text-sky-700',
+      },
+      {
+        key: 'FE 2024',
+        box: '2024',
+        full: 'FE 2024',
+        desc: 'Opens the official SPPU exam circular',
+        link: feDocumentLink,
+        cta: 'Open PDF',
+        note: 'Official SPPU PDF',
+        color: 'from-rose-500 to-rose-700',
+        bg: 'bg-rose-50',
+        text: 'text-rose-700',
+      },
+    ]).map((card) => {
 
       const count = allPapers.filter(
-        (p) => p.year_level === yr.key
+        (p) => p.year_level === 'FE'
       ).length;
-
-      const archive = allPapers.find(
-        (p) =>
-          p.year_level === yr.key &&
-          p.subject_name?.toLowerCase().includes('archive')
-      );
 
       const inner = (
         <>
           <div
-            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${yr.color} text-white flex items-center justify-center mb-3 font-display font-bold text-lg shadow-sm`}
+            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${card.color} text-white flex items-center justify-center mb-3 font-display font-bold text-lg shadow-sm`}
           >
-            {yr.key}
+            {card.box}
           </div>
 
           <p className="font-semibold text-slate-900 text-sm">
-            {yr.full}
+            {card.full}
           </p>
 
           <p className="text-xs text-slate-400 mt-0.5">
-            {yr.desc}
+            {card.desc}
           </p>
 
           <p className="text-xs text-slate-500 font-medium mt-2">
-            {count} papers
+            {card.key === 'FE' ? `${count} papers` : card.note}
           </p>
 
-          <span className={`mt-3 badge ${yr.bg} ${yr.text}`}>
-            {archive ? 'Open Drive' : 'View papers'}
+          <span className={`mt-3 badge ${card.bg} ${card.text}`}>
+            {card.cta}
             <ArrowRight className="w-3 h-3" />
           </span>
         </>
       );
 
-      if (archive) {
+      // Both cards open their document directly in a new tab: no branch,
+      // semester, subject or pattern step in between.
+      if (card.link) {
         return (
           <a
-            key={yr.key}
-            href={archive.drive_link}
+            key={card.key}
+            href={card.link}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`${card.full} — ${card.cta}`}
             className="card p-6 w-full max-w-xs flex flex-col items-center text-center hover:shadow-md hover:-translate-y-0.5 transition-all group"
           >
             {inner}
@@ -287,10 +323,11 @@ export default function Home() {
         );
       }
 
+      // No link stored yet: keep the previous behaviour.
       return (
         <Link
-          key={yr.key}
-          to={`/browse?year=${yr.key}`}
+          key={card.key}
+          to="/browse?year=FE"
           className="card p-6 w-full max-w-xs flex flex-col items-center text-center hover:shadow-md hover:-translate-y-0.5 transition-all group"
         >
           {inner}
