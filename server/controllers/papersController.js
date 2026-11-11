@@ -102,6 +102,32 @@ async function buildPaperPayload(body, { partial = false } = {}) {
   return payload;
 }
 
+/**
+ * Aggregates average rating + review count for a set of papers in one query,
+ * so list views can show ratings without an N+1 fan-out.
+ */
+async function ratingsForPapers(ids) {
+  if (!ids || ids.length === 0) return {};
+  const rows = await Feedback.aggregate([
+    { $match: { paper: { $in: ids } } },
+    {
+      $group: {
+        _id: '$paper',
+        average: { $avg: '$rating' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const map = {};
+  for (const row of rows) {
+    map[row._id.toString()] = {
+      rating_average: Number(row.average.toFixed(2)),
+      rating_count: row.count,
+    };
+  }
+  return map;
+}
+
 /** GET /api/papers */
 export const listPapers = asyncHandler(async (req, res) => {
   const { year_level, pattern, branch, category, semester, subject_id, q, limit } = req.query;
@@ -138,7 +164,13 @@ export const listPapers = asyncHandler(async (req, res) => {
   if (Number.isFinite(parsedLimit) && parsedLimit > 0) query.limit(Math.min(parsedLimit, 500));
 
   const papers = await query.exec();
-  res.json(papers.map(toPaper));
+  const ratings = await ratingsForPapers(papers.map((paper) => paper._id));
+  res.json(
+    papers.map((paper) => ({
+      ...toPaper(paper),
+      ...(ratings[paper._id.toString()] || { rating_average: 0, rating_count: 0 }),
+    }))
+  );
 });
 
 /** GET /api/papers/stats */
@@ -166,7 +198,11 @@ export const getStats = asyncHandler(async (_req, res) => {
 export const getPaper = asyncHandler(async (req, res) => {
   const paper = await Paper.findById(req.params.id);
   if (!paper) throw ApiError.notFound('Paper not found');
-  res.json(toPaper(paper));
+  const ratings = await ratingsForPapers([paper._id]);
+  res.json({
+    ...toPaper(paper),
+    ...(ratings[paper._id.toString()] || { rating_average: 0, rating_count: 0 }),
+  });
 });
 
 /** POST /api/papers (admin) */
