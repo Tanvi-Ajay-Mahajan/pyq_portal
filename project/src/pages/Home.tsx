@@ -349,7 +349,7 @@ export default function Home() {
                 return (
                   <Link
                     key={branch}
-                    to={`/browse?branch=${encodeURIComponent(branch)}`}
+                    to="/browse"
                     className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-primary-200 transition-all group"
                   >
                     {cardInner}
