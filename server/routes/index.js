@@ -7,6 +7,7 @@ import referenceRoutes from './referenceRoutes.js';
 import feedbackRoutes from './feedbackRoutes.js';
 import driveRoutes from './driveRoutes.js';
 import userRoutes from './userRoutes.js';
+import aiRoutes from './aiRoutes.js';
 
 const router = Router();
 
@@ -47,5 +48,6 @@ router.use('/papers', paperRoutes);
 router.use('/reference', referenceRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/users', userRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;
