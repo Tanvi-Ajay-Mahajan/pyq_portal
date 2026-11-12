@@ -57,6 +57,17 @@ const builtinFolders = () => [
 ];
 
 /**
+ * Applies a Mongo-style filter to the built-in folders so the read-only
+ * defaults behave like a small in-memory collection.
+ */
+const filterBuiltin = (filter = {}) =>
+  builtinFolders().filter((folder) => {
+    if (filter.year_level && folder.year_level !== filter.year_level) return false;
+    if (filter.branch && folder.branch !== filter.branch) return false;
+    return true;
+  });
+
+/**
  * Picks the best Drive folder for a year + branch + optional pattern:
  *  1. exact year + branch + pattern
  *  2. exact year + branch, newest pattern
@@ -141,6 +152,19 @@ export const resolveDriveFolder = asyncHandler(async (req, res) => {
   const picked = pickFolder(candidates, { yearLevel, branchKey, branchName, pattern });
 
   if (!picked) {
+    // A freshly connected database has no Drive folders yet. Serve the built-in
+    // defaults so branch clicks keep working until the seed script has run.
+    const builtin = pickFolder(filterBuiltin(), { yearLevel, branchKey, branchName, pattern });
+    if (builtin) {
+      return res.json({
+        ...toDriveFolder(builtin.doc),
+        branch: builtin.doc.branch,
+        match: builtin.match,
+        requested_branch: branchName,
+        source: 'builtin',
+      });
+    }
+
     // Nothing stored yet — fall back to the newest paper link for this branch.
     const paperFilter = { branch: new RegExp(`^${branchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
     if (yearLevel) paperFilter.year_level = yearLevel;
@@ -178,16 +202,19 @@ export const listDriveFolders = asyncHandler(async (req, res) => {
   if (req.query.branch) filter.branch = req.query.branch;
 
   if (!isDbConnected()) {
-    const folders = builtinFolders().filter((folder) => {
-      if (filter.year_level && folder.year_level !== filter.year_level) return false;
-      if (filter.branch && folder.branch !== filter.branch) return false;
-      return true;
-    });
-    return res.json(folders.map((folder) => ({ ...toDriveFolder(folder), source: 'builtin' })));
+    return res.json(
+      filterBuiltin(filter).map((folder) => ({ ...toDriveFolder(folder), source: 'builtin' }))
+    );
   }
 
   const folders = await DriveFolder.find(filter).sort({ branch: 1, pattern: -1 });
-  res.json(folders.map(toDriveFolder));
+  if (folders.length > 0) return res.json(folders.map(toDriveFolder));
+
+  // Freshly connected database with no Drive folders stored yet — keep the
+  // built-in defaults visible instead of returning an empty list.
+  return res.json(
+    filterBuiltin(filter).map((folder) => ({ ...toDriveFolder(folder), source: 'builtin' }))
+  );
 });
 
 /** POST /api/drive-folders (admin) */
