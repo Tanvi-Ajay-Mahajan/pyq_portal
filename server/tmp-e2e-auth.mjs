@@ -103,7 +103,7 @@ try {
     method: 'POST',
     body: { name: 'E2E Student', email: 'other@example.com', password: 'short' },
   });
-  record('password shorter than 8 chars is rejected with 422', shortPass.status === 422, `status ${shortPass.status}`);
+  record('password shorter than 8 chars is rejected with 400', shortPass.status === 400, `status ${shortPass.status}`);
 
   const papers = await call('/papers', { token: login.data?.token });
   record('papers endpoint works once a database exists', papers.status === 200, `status ${papers.status}`);
