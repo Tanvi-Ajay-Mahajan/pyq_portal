@@ -148,6 +148,40 @@ available on port 3000.
 
 `.env` files are git-ignored. Never commit real credentials or the JWT secret.
 
+### AI study features (Google Gemini)
+
+The AI tools are server-side only: the browser never sees the API key. Without
+`GEMINI_API_KEY` the pages still load and show a clear "AI is not configured" notice
+instead of fake answers.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | for AI | Google AI Studio key (https://aistudio.google.com/apikey) |
+| `GEMINI_MODEL` | no | Chat/vision model, default `gemini-2.5-flash` |
+| `GEMINI_EMBED_MODEL` | no | Embedding model used for document retrieval |
+| `AI_TIMEOUT_MS` | no | Per-generation timeout, default `60000` |
+| `AI_MAX_PDF_MB` | no | Upload size limit, default `15` |
+| `AI_MAX_PAGES` / `AI_MAX_CHUNKS` | no | PDF ingestion limits, default `200` / `400` |
+| `AI_OCR_ENABLED` | no | `true` enables OCR for scanned PDFs (memory heavy) |
+
+AI endpoints (all under `/api/ai`, JWT required, per-user rate limited):
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/status` | Whether AI is configured, model name, limits |
+| GET/POST/DELETE | `/documents`, `/documents/:id` | List, upload (PDF) and delete study documents |
+| GET/POST | `/conversations` | List and create conversations |
+| PATCH/DELETE | `/conversations/:id` | Rename or delete a conversation |
+| GET/POST | `/conversations/:id/messages` | Chat history and a new question (grounded in the selected PDF) |
+| POST | `/solve` | Question-paper solver with 2/5/10-mark answer depth |
+| GET/POST | `/quizzes`, `/quiz` | List attempts and generate an MCQ quiz |
+| POST | `/quiz/:id/submit` | Score a quiz and return explanations |
+| POST | `/summary` | Chapter summaries, definitions, formulas and FAQs |
+| GET/POST/PATCH/DELETE | `/flashcards`, `/flashcards/:id` | Generate, list, star and delete flashcards |
+
+Documents are extracted, chunked and embedded on upload; questions retrieve only the
+most relevant chunks, so answers stay grounded in the uploaded material and cite pages.
+
 ---
 
 ## 4. MongoDB collections
