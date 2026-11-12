@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { apiErrorMessage } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { Mail, Lock, User, UserPlus, Eye, EyeOff, Loader2, GraduationCap, CheckCircle } from 'lucide-react';
 
@@ -30,14 +31,16 @@ export default function Register() {
     e.preventDefault();
     if (!canSubmit) return;
     setLoading(true);
-    const { error } = await signUp(email, password, fullName);
-    setLoading(false);
-    if (error) {
-      notify('error', error);
-      return;
+    try {
+      // signUp(name, email, password) — argument order must match the context.
+      await signUp(fullName.trim(), email, password);
+      notify('success', 'Account created! You are now signed in.');
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      notify('error', apiErrorMessage(error));
+    } finally {
+      setLoading(false);
     }
-    notify('success', 'Account created! You are now signed in.');
-    navigate('/dashboard', { replace: true });
   };
 
   return (
