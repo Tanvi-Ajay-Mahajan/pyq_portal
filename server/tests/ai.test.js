@@ -184,7 +184,7 @@ test('a file that is not a real PDF is rejected', async () => {
   const fake = Buffer.from('This is plain text pretending to be a PDF document.');
   const { status, json } = await uploadPdf(token, fake, 'fake.pdf');
   assert.equal(status, 400);
-  assert.match(json.message, /not a valid PDF/i);
+  assert.match(json.error, /pdf/i);
 });
 
 test('chat history and documents are isolated per user', async () => {
@@ -236,7 +236,7 @@ test('generation returns a clear 503 while no AI provider key is configured', as
     body: { content: 'Explain binary search tree' },
   });
   assert.equal(message.status, 503);
-  assert.match(message.json.message, /GEMINI_API_KEY/);
+  assert.match(message.json.error, /GEMINI_API_KEY/);
 
   const solve = await api('/ai/solve', {
     method: 'POST',
