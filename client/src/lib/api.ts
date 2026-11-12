@@ -77,3 +77,14 @@ export function apiErrorMessage(error: unknown, fallback = 'Something went wrong
 }
 
 export default api;
+
+/**
+ * True when the API is reachable but has no database configured (503 from the
+ * API's database guard), so the UI can explain it instead of showing a raw error.
+ */
+export function isDatabaseNotConfigured(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  if (error.response?.status !== 503) return false;
+  const data = error.response?.data as { error?: string; message?: string } | undefined;
+  return /MONGODB_URI|database not configured/i.test(`${data?.error ?? ''} ${data?.message ?? ''}`);
+}

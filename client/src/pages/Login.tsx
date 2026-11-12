@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { apiErrorMessage } from '@/lib/api';
+import { apiErrorMessage, isDatabaseNotConfigured } from '@/lib/api';
+import DbSetupNotice from '@/components/DbSetupNotice';
 import { useToast } from '@/context/ToastContext';
 import { Mail, Lock, LogIn, Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react';
 
@@ -14,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dbMissing, setDbMissing] = useState(false);
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
@@ -29,6 +31,7 @@ export default function Login() {
       notify('success', 'Welcome back! Signed in successfully.');
       navigate(from, { replace: true });
     } catch (error) {
+      setDbMissing(isDatabaseNotConfigured(error));
       notify('error', apiErrorMessage(error));
     } finally {
       setLoading(false);
@@ -79,6 +82,8 @@ export default function Login() {
 
           <h2 className="font-display text-2xl font-bold text-slate-900 mb-1">Sign in to your account</h2>
           <p className="text-sm text-slate-500 mb-8">Enter your credentials to access the portal.</p>
+
+          {dbMissing && <DbSetupNotice />}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

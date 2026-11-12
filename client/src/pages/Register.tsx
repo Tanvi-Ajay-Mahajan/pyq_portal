@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { apiErrorMessage } from '@/lib/api';
+import { apiErrorMessage, isDatabaseNotConfigured } from '@/lib/api';
+import DbSetupNotice from '@/components/DbSetupNotice';
 import { useToast } from '@/context/ToastContext';
 import { Mail, Lock, User, UserPlus, Eye, EyeOff, Loader2, GraduationCap, CheckCircle } from 'lucide-react';
 
@@ -15,6 +16,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dbMissing, setDbMissing] = useState(false);
 
   const passwordChecks = [
     { label: 'At least 6 characters', ok: password.length >= 6 },
@@ -37,6 +39,7 @@ export default function Register() {
       notify('success', 'Account created! You are now signed in.');
       navigate('/dashboard', { replace: true });
     } catch (error) {
+      setDbMissing(isDatabaseNotConfigured(error));
       notify('error', apiErrorMessage(error));
     } finally {
       setLoading(false);
@@ -85,6 +88,8 @@ export default function Register() {
 
           <h2 className="font-display text-2xl font-bold text-slate-900 mb-1">Create a student account</h2>
           <p className="text-sm text-slate-500 mb-8">New accounts are registered as students by default.</p>
+
+          {dbMissing && <DbSetupNotice />}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
