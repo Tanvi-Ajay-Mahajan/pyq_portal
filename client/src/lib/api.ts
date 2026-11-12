@@ -56,7 +56,7 @@ api.interceptors.response.use(
 export function apiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as
-      | { message?: string; errors?: { field?: string; message?: string }[] }
+      | { message?: string; error?: string; errors?: { field?: string; message?: string }[] }
       | undefined;
     if (data?.errors?.length) {
       return data.errors
@@ -65,6 +65,8 @@ export function apiErrorMessage(error: unknown, fallback = 'Something went wrong
         .join(', ');
     }
     if (data?.message) return data.message;
+    // The Express API uses `{ error: "..." }` for its failure envelope.
+    if (data?.error) return data.error;
     if (error.code === 'ERR_NETWORK') {
       return 'Cannot reach the API server. Is the backend running?';
     }
