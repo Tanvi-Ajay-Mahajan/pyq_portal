@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { apiErrorMessage } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { Mail, Lock, LogIn, Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react';
 
@@ -23,14 +24,15 @@ export default function Login() {
     e.preventDefault();
     if (!emailValid || password.length < 6) return;
     setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
-    if (error) {
-      notify('error', error);
-      return;
+    try {
+      await signIn(email, password);
+      notify('success', 'Welcome back! Signed in successfully.');
+      navigate(from, { replace: true });
+    } catch (error) {
+      notify('error', apiErrorMessage(error));
+    } finally {
+      setLoading(false);
     }
-    notify('success', 'Welcome back! Signed in successfully.');
-    navigate(from, { replace: true });
   };
 
   return (
