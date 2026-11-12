@@ -40,6 +40,21 @@ export const env = {
   // Optional: only used by scripts/export-supabase.js for the one-time data export.
   SUPABASE_URL: (process.env.SUPABASE_URL || '').trim().replace(/\/$/, ''),
   SUPABASE_SERVICE_ROLE_KEY: (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(),
+
+  // --- AI (Google Gemini) -------------------------------------------------
+  // The key stays on the server: it is never sent to the browser.
+  GEMINI_API_KEY: (process.env.GEMINI_API_KEY || '').trim(),
+  GEMINI_MODEL: (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim(),
+  GEMINI_EMBED_MODEL: (process.env.GEMINI_EMBED_MODEL || 'text-embedding-004').trim(),
+  AI_TIMEOUT_MS: Number(process.env.AI_TIMEOUT_MS || 60000),
+  AI_MAX_PDF_MB: Number(process.env.AI_MAX_PDF_MB || 15),
+  AI_MAX_PAGES: Number(process.env.AI_MAX_PAGES || 200),
+  AI_MAX_CHUNKS: Number(process.env.AI_MAX_CHUNKS || 400),
+  // OCR is opt-in: it is memory heavy and off by default on small instances.
+  AI_OCR_ENABLED: process.env.AI_OCR_ENABLED === 'true',
 };
 
 export const isDbConfigured = () => Boolean(env.MONGODB_URI);
+
+/** True when an AI provider key is present, so AI routes can answer for real. */
+export const isAiConfigured = () => Boolean(env.GEMINI_API_KEY);
