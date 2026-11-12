@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { FileText, LogOut, LayoutDashboard, ShieldCheck, BookOpen, Menu, X, GraduationCap } from 'lucide-react';
+import { FileText, LogOut, LayoutDashboard, ShieldCheck, BookOpen, Menu, X, GraduationCap, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Navbar() {
@@ -37,6 +37,11 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-1">
           <Link to="/" className={navLinkClass('/')}>Home</Link>
           <Link to="/browse" className={navLinkClass('/browse')}>Browse Papers</Link>
+          <Link to="/ai" className={navLinkClass('/ai')}>
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4" /> AI Assistant
+            </span>
+          </Link>
           {session && (
             <Link to="/dashboard" className={navLinkClass('/dashboard')}>
               <span className="inline-flex items-center gap-1.5">
@@ -90,6 +95,9 @@ export default function Navbar() {
         <div className="md:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1 animate-fade-in">
           <Link to="/" onClick={() => setMobileOpen(false)} className="block px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">Home</Link>
           <Link to="/browse" onClick={() => setMobileOpen(false)} className="block px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">Browse Papers</Link>
+          <Link to="/ai" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
+            <Sparkles className="w-4 h-4" /> AI Assistant
+          </Link>
           {session && (
             <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
               <LayoutDashboard className="w-4 h-4" /> Dashboard

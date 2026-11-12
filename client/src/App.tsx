@@ -11,6 +11,7 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 import Admin from '@/pages/Admin';
+import AiStudio from '@/pages/AiStudio';
 
 export default function App() {
   return (
@@ -24,6 +25,14 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/browse" element={<Browse />} />
                 <Route path="/branches" element={<Branches />} />
+                <Route
+                  path="/ai"
+                  element={
+                    <ProtectedRoute>
+                      <AiStudio />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route
