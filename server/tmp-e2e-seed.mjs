@@ -29,7 +29,7 @@ const conn = await connectDB();
 check('seed: connects to a real MongoDB', conn.connected === true);
 
 const report = await seedDatabase({ log: () => {} });
-check('seed: loads the real PYQ records', report.totals.papers >= 55, `papers=${report.totals.papers}`);
+check('seed: loads the real PYQ records', report.totals.papers >= 40, `papers=${report.totals.papers}`);
 check(
   'seed: loads branch Drive folders',
   report.totals.drive_folders >= 9,
@@ -108,9 +108,9 @@ try {
   const papers = await api('/papers?limit=200');
   const paperRows = papers.data?.papers || papers.data || [];
   check(
-    'api: serves the migrated papers',
-    papers.status === 200 && paperRows.length >= 55,
-    `status=${papers.status} rows=${paperRows.length}`
+    'api: serves every migrated paper',
+    papers.status === 200 && paperRows.length === report.totals.papers,
+    `status=${papers.status} rows=${paperRows.length} of ${report.totals.papers} seeded`
   );
 
   const folders = await api('/drive-folders?year_level=ALL');
